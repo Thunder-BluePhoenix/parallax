@@ -1,4 +1,3 @@
-use tauri::command;
 use crate::schema_explorer::{SchemaExplorer, ExplorerResult};
 use serde::{Deserialize, Serialize};
 

@@ -521,4 +521,3 @@ fn extract_html_input_value(html: &str, field_name: &str) -> String {
         .unwrap_or_default()
 }
 
-use base64::Engine;

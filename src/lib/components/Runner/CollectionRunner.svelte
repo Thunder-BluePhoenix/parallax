@@ -12,13 +12,14 @@
   import { runPreRequestScript, runTestScript } from "../../utils/pm-script-runner";
   import type { CollectionRequest, ResponseState, TestResult } from "../../stores/app.svelte";
 
-  let { onClose = $bindable() } = $props<{ onClose: () => void }>();
+  let { onClose } = $props<{ onClose: () => void }>();
 
   let selectedCollectionId = $state<string>("");
   let selectedFolderId     = $state<string>(""); // empty means run whole collection
   let iterations           = $state(1);
   let delayMs              = $state(0);
   let stopOnFailure        = $state(false);
+  const uuid = () => Math.random().toString(36).substring(2) + Date.now().toString(36);
 
   // Runner state
   let isRunning  = $state(false);
@@ -169,14 +170,14 @@
 
         } catch (e: any) {
           currentError = e?.toString() ?? "Request failed";
-          currentTests.push({ name: "Request execution", passed: false, error: currentError ?? undefined });
+          currentTests.push({ name: "Request execution", passed: false, error: currentError || undefined });
           runStats.failed++;
         }
 
         const duration = Date.now() - t0;
         
         runFeed.push({
-          id: crypto.randomUUID(), reqName: req.name, method: req.method,
+          id: uuid(), reqName: req.name, method: req.method,
           status: currentStatus, timeMs: duration, tests: currentTests, error: currentError
         });
 

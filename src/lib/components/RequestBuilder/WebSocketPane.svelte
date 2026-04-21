@@ -261,9 +261,9 @@
   .frame-binary    .frame-type { color: var(--color-warning); }
   .frame-ping      .frame-type { color: var(--text-muted); }
   .frame-close     .frame-type { color: var(--color-error); }
-  .frame-error     .frame-row,
-  .frame-error     .frame-type { color: var(--color-error); }
-  .frame-error { background: var(--color-error-dim); }
+  .frame-row.frame-error,
+  .frame-row.frame-error .frame-type { color: var(--color-error); }
+  .frame-row.frame-error { background: var(--color-error-dim); }
 
   /* Send bar */
   .ws-send-bar {

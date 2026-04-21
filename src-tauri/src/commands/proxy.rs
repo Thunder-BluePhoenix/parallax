@@ -4,8 +4,6 @@ use std::time::Duration;
 use crate::commands::worker::pb;
 use pb::proxy_service_client::ProxyServiceClient;
 use pb::{GenericRequest, TrafficRequest};
-use tokio::sync::Mutex;
-use std::sync::Arc;
 use serde::Serialize;
 
 #[derive(Serialize, Clone)]

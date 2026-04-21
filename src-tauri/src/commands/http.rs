@@ -1,9 +1,5 @@
 use std::collections::HashMap;
-use tauri::State;
-use serde::{Deserialize, Serialize};
 use crate::http_engine::{HttpEngine, ParallaxRequest, ParallaxResponse};
-
-pub struct HttpEngineState(pub HttpEngine);
 
 #[tauri::command]
 pub async fn send_request(

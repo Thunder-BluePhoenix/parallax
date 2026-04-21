@@ -4,7 +4,6 @@
 use std::path::{Path, PathBuf};
 use serde::{Deserialize, Serialize};
 use anyhow::Result;
-use std::collections::HashMap;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SchemaField {

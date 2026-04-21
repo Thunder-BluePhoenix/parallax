@@ -1,4 +1,3 @@
-use tauri::command;
 use serde::{Deserialize, Serialize};
 use crate::auth_providers::{AuthProviderManager, EcosystemProvider, ProviderCredentials, AuthSession};
 
@@ -36,9 +35,9 @@ pub async fn perform_auth(input: PerformAuthInput) -> Result<AuthSession, String
 
 #[tauri::command]
 pub async fn refresh_auth(
-    provider: String,
-    session: serde_json::Value,
-    base_url: String,
+    _provider: String,
+    _session: serde_json::Value,
+    _base_url: String,
 ) -> Result<AuthSession, String> {
     // Re-authenticate using stored session metadata
     // For now, delegate back to perform_auth with stored creds

@@ -1,9 +1,9 @@
 use std::collections::HashMap;
 use std::sync::Arc;
-use tokio::sync::{mpsc, Mutex};
+use tokio::sync::Mutex;
 use tauri::{AppHandle, Emitter};
 use serde::{Deserialize, Serialize};
-use reqwest::{Client, Method};
+use reqwest::Method;
 use futures_util::StreamExt;
 use crate::http_engine::{HttpEngine, ParallaxRequest};
 
@@ -48,7 +48,7 @@ pub async fn sse_connect(
         timestamp_ms: now_ms(),
     });
 
-    let engine = HttpEngine::default();
+    let _engine = HttpEngine::default();
     
     // Create the reqwest request builder just like execute()
     let resolved_url = HttpEngine::resolve_env(&req.url, &env);

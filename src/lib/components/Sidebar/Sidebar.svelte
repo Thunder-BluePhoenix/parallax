@@ -10,6 +10,7 @@
   import { importPostmanCollection, importInsomniaExport } from "../../utils/postman-importer";
 
   let searchQuery   = $state("");
+  const uuid = () => Math.random().toString(36).substring(2) + Date.now().toString(36);
   let showEnvPanel  = $state(false);
   let importError   = $state("");
   let expandedCols  = $state<Record<string, boolean>>({});
@@ -62,7 +63,7 @@
 
   // ── New blank request ──────────────────────────────────────
   function newRequest() {
-    const id = crypto.randomUUID();
+    const id = uuid();
     tabs.list.push({ id, name: "New Request", method: "GET", modified: false });
     tabs.activeId = id;
     activeRequest.id          = id;

@@ -249,7 +249,7 @@
   }
 
   /* Forms */
-  .add-target-form, .config-row, .explorer-input {
+  .config-row, .explorer-input {
     display: flex;
     gap: 8px;
     margin-bottom: 16px;
@@ -395,15 +395,4 @@
   }
   .schema-explorer h3 { font-size: 14px; font-weight: 700; margin-bottom: 6px; }
 
-  .pulse-dot {
-    display: inline-block;
-    width: 7px;
-    height: 7px;
-    border-radius: 50%;
-    background: var(--text-muted);
-  }
-  .pulse-dot.up {
-    background: var(--color-success);
-    animation: pulse-dot 2s infinite;
-  }
 </style>

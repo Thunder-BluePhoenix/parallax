@@ -6,6 +6,7 @@
   import SSEPane from "./SSEPane.svelte";
 
   let activeTab = $state("params");
+  const uuid = () => Math.random().toString(36).substring(2) + Date.now().toString(36);
 
   const METHODS = ["GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS", "WS", "SSE"] as const;
 
@@ -52,7 +53,7 @@
     </div>
 
     <button class="new-tab-btn" onclick={() => {
-      const id = crypto.randomUUID();
+      const id = uuid();
       tabs.list.push({ id, name: "New Request", method: "GET", modified: false });
       tabs.activeId = id;
     }}>+</button>

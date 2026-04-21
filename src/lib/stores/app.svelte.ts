@@ -1,6 +1,9 @@
 // Parallax Global App State — Svelte 5 Runes
+console.log("[Parallax] Store module loading...");
 import { invoke } from "@tauri-apps/api/core";
 import { resolveRequestTemplates } from "../utils/template-tags";
+
+const uuid = () => Math.random().toString(36).substring(2) + Date.now().toString(36);
 
 // ============================================================
 // App Mode & Overlays
@@ -55,7 +58,7 @@ export function defaultAuth(): AuthState {
 }
 
 export const activeRequest = $state<RequestState>({
-  id: crypto.randomUUID(), name: "New Request", method: "GET", url: "",
+  id: uuid(), name: "New Request", method: "GET", url: "",
   headers: {}, params: {}, bodyType: "none", bodyContent: "", auth: defaultAuth(),
 });
 
@@ -308,7 +311,7 @@ export async function sendRequest() {
     }
 
     responseHistory.unshift({
-      id:          crypto.randomUUID(),
+      id:          uuid(),
       requestId:   activeRequest.id,
       requestName: activeRequest.name,
       method:      activeRequest.method,

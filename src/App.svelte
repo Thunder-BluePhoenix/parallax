@@ -2,8 +2,8 @@
   import Titlebar from "./lib/components/Titlebar.svelte";
   import Sidebar from "./lib/components/Sidebar/Sidebar.svelte";
   import BuilderMode from "./lib/components/RequestBuilder/BuilderMode.svelte";
-  import DashboardMode from "./lib/components/Dashboard/DashboardMode.svelte";
-  import CollectionRunner from "./lib/components/Runner/CollectionRunner.svelte";
+  // import DashboardMode from "./lib/components/Dashboard/DashboardMode.svelte";
+  // import CollectionRunner from "./lib/components/Runner/CollectionRunner.svelte";
   import { appMode, showRunner } from "./lib/stores/app.svelte";
 
   let isDashboard = $derived(appMode.value === "dashboard");
@@ -17,16 +17,12 @@
 
     <div class="main-content">
       {#if isDashboard}
-        <DashboardMode />
+        <div style="padding: 20px; color: white;">Dashboard (Temporarily Disabled)</div>
       {:else}
         <BuilderMode />
       {/if}
     </div>
   </div>
-
-  {#if showRunner.value}
-    <CollectionRunner onClose={() => (showRunner.value = false)} />
-  {/if}
 </div>
 
 <style>

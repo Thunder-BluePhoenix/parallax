@@ -1,7 +1,8 @@
 <script lang="ts">
-  import { responseState, responseHistory, testResults } from "../../stores/app.svelte";
+  import { responseState, responseHistory, testResults, visualizerData } from "../../stores/app.svelte";
+  import VisualizerIframe from "./VisualizerIframe.svelte";
 
-  let viewMode   = $state<"pretty" | "raw" | "headers" | "tests" | "history">("pretty");
+  let viewMode   = $state<"pretty" | "raw" | "headers" | "tests" | "history" | "visualize">("pretty");
   let historyIdx = $state(0);
 
   function statusClass(code: number) {
@@ -91,6 +92,15 @@
             <span class="test-badge">{responseHistory.length}</span>
           {/if}
         </button>
+        {#if visualizerData.template}
+          <button
+            class="view-mode-btn visualizer-btn"
+            class:active={viewMode === "visualize"}
+            onclick={() => (viewMode = "visualize")}
+          >
+            Visualize
+          </button>
+        {/if}
       </div>
     </div>
 
@@ -168,6 +178,10 @@
               </div>
             {/if}
           {/if}
+        </div>
+      {:else if viewMode === "visualize"}
+        <div class="visualizer-wrapper">
+          <VisualizerIframe />
         </div>
       {/if}
     </div>
@@ -374,6 +388,9 @@
   }
 
   /* Test badge on view-mode button */
+  .visualizer-btn {
+    color: var(--accent-primary);
+  }
   .test-badge {
     display: inline-block;
     margin-left: 4px;
@@ -475,4 +492,6 @@
   .history-time { font-family: var(--font-mono); font-size: 10px; color: var(--text-muted); text-align: right; }
 
   .history-body { flex: 1; }
+  
+  .visualizer-wrapper { flex: 1; height: 100%; display: flex; flex-direction: column; }
 </style>

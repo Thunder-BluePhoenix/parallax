@@ -7,6 +7,7 @@ import type { ResponseState, TestResult } from "../stores/app.svelte";
 function buildPm(env: Record<string, string>, response?: ResponseState) {
   const tests: TestResult[] = [];
   const collectedLogs: string[] = [];
+  const visualizerState: { template: string | null; data: any | null } = { template: null, data: null };
 
   const pmEnv = {
     get: (key: string) => env[key] ?? undefined,
@@ -39,6 +40,12 @@ function buildPm(env: Record<string, string>, response?: ResponseState) {
     globals:     pmEnv, // share same store for simplicity
     variables:   pmEnv,
     response:    pmResponse,
+    visualizer: {
+      set: (template: string, data?: any) => {
+        visualizerState.template = template;
+        visualizerState.data = data ?? null;
+      },
+    },
 
     test: (name: string, fn: () => void) => {
       try {
@@ -80,7 +87,7 @@ function buildPm(env: Record<string, string>, response?: ResponseState) {
     }),
   };
 
-  return { pm, tests, logs: collectedLogs, env };
+  return { pm, tests, logs: collectedLogs, env, visualizerState };
 }
 
 // ── Pre-request script ─────────────────────────────────────────────────────────
@@ -100,10 +107,10 @@ export async function runTestScript(
   script: string,
   response: ResponseState,
   env: Record<string, string>,
-): Promise<TestResult[]> {
-  const { pm, tests } = buildPm(env, response);
+): Promise<{ tests: TestResult[]; visualizer: { template: string | null; data: any | null } }> {
+  const { pm, tests, visualizerState } = buildPm(env, response);
   const fn = new Function("pm", "console", `"use strict";\n${script}`);
   const fakeConsole = { log: () => {}, warn: () => {}, error: () => {} };
   fn(pm, fakeConsole);
-  return tests;
+  return { tests, visualizer: visualizerState };
 }

@@ -3,7 +3,8 @@
   import Sidebar from "./lib/components/Sidebar/Sidebar.svelte";
   import BuilderMode from "./lib/components/RequestBuilder/BuilderMode.svelte";
   import DashboardMode from "./lib/components/Dashboard/DashboardMode.svelte";
-  import { appMode, currentWorkspace } from "./lib/stores/app.svelte";
+  import CollectionRunner from "./lib/components/Runner/CollectionRunner.svelte";
+  import { appMode, showRunner } from "./lib/stores/app.svelte";
 
   let isDashboard = $derived(appMode.value === "dashboard");
 </script>
@@ -22,6 +23,10 @@
       {/if}
     </div>
   </div>
+
+  {#if showRunner.value}
+    <CollectionRunner onClose={() => (showRunner.value = false)} />
+  {/if}
 </div>
 
 <style>

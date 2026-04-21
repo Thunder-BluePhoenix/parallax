@@ -3,9 +3,10 @@ import { invoke } from "@tauri-apps/api/core";
 import { resolveRequestTemplates } from "../utils/template-tags";
 
 // ============================================================
-// App Mode
+// App Mode & Overlays
 // ============================================================
 export const appMode = $state<{ value: "builder" | "dashboard" }>({ value: "builder" });
+export const showRunner = $state<{ value: boolean }>({ value: false });
 
 // ============================================================
 // Current Workspace
@@ -68,6 +69,14 @@ export interface ResponseState {
 }
 export const responseState = $state<{ loading: boolean; response: ResponseState | null; error: string | null }>({
   loading: false, response: null, error: null,
+});
+
+// ============================================================
+// Visualizer state
+// ============================================================
+export const visualizerData = $state<{ template: string | null; data: any | null }>({
+  template: null,
+  data: null,
 });
 
 // ============================================================
@@ -245,6 +254,8 @@ export async function sendRequest() {
   responseState.response = null;
   testResults.results    = [];
   testResults.ran        = false;
+  visualizerData.template = null;
+  visualizerData.data    = null;
   const t0 = Date.now();
 
   try {
@@ -287,9 +298,13 @@ export async function sendRequest() {
     // Run test script
     if (activeScripts.tests.trim()) {
       const { runTestScript } = await import("../utils/pm-script-runner");
-      const results = await runTestScript(activeScripts.tests, response, mergedEnv);
-      testResults.results = results;
+      const { tests, visualizer } = await runTestScript(activeScripts.tests, response, mergedEnv);
+      testResults.results = tests;
       testResults.ran     = true;
+      if (visualizer.template) {
+        visualizerData.template = visualizer.template;
+        visualizerData.data = visualizer.data;
+      }
     }
 
     responseHistory.unshift({

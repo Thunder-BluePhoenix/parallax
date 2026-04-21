@@ -1,13 +1,13 @@
 # Parallax — Development Tracker
 
-Last updated: 2026-04-21
+Last updated: 2026-04-22
 
 ---
 
 ## Overall Progress
 
 ```
-Phase 1  ████░░░░░░░░░░░░░░░░  20%  🔄 In Progress  (scaffold done, core features pending)
+Phase 1  ████████████░░░░░░░░  60%  🔄 In Progress
 Phase 2  ░░░░░░░░░░░░░░░░░░░░   0%  🔲 Planned
 Phase 3  ░░░░░░░░░░░░░░░░░░░░   0%  🔲 Planned
 Phase 4  ░░░░░░░░░░░░░░░░░░░░   0%  🔲 Planned
@@ -21,92 +21,113 @@ Phase 5  ░░░░░░░░░░░░░░░░░░░░   0%  🔲
 ### Infrastructure
 | Task | Status | Notes |
 |---|---|---|
-| Tauri v2 project initialized | ✅ Done | Manual scaffold — npm create was hanging |
-| Svelte 5 frontend wired | ✅ Done | `src/` directory with components |
-| Go sidecar directory created | ✅ Done | `src-go/` with watcher, proxy, loadtest, health stubs |
+| Tauri v2 project initialized | ✅ Done | Manual scaffold |
+| Svelte 5 frontend wired | ✅ Done | `src/` with full component tree |
+| Go sidecar directory created | ✅ Done | `src-go/` with gRPC stubs |
 | gRPC proto definitions | ✅ Done | `proto/parallax.proto` |
 | `.parallax/` example folder | ✅ Done | Sample YAML collection included |
-| npm install passing | ✅ Done | `--legacy-peer-deps` flag needed |
+| npm install passing | ✅ Done | `--legacy-peer-deps` |
 | Tauri CLI v2 installed | ✅ Done | v2.10.1 |
-| `cargo check` passing | ❌ Blocked | `generate_context!()` macro expansion error |
-| `cargo tauri dev` launching | ❌ Blocked | Depends on cargo check |
+| `cargo check` passing | ✅ Done | Zero errors (warnings only) |
+| `cargo tauri dev` launching | ✅ Done | App runs; Go sidecar on gRPC :50151 |
+| Go binary compiled and bundled | ✅ Done | `parallax-worker-aarch64-apple-darwin` |
+| Tauri shell plugin config fixed | ✅ Done | Removed invalid `all`/`execute`/`sidecar` fields |
+| `.gitignore` with `.claude` exclusion | ✅ Done | Sensitive `.parallax/` paths also gitignored |
 
 ### Protocols (HTTP Engine — Rust)
 | Task | Status | Notes |
 |---|---|---|
 | REST — all methods (GET, POST, PUT, PATCH, DELETE, HEAD, OPTIONS) | ✅ Done | Via `reqwest` |
-| HTTP/2 support | 🔲 | `reqwest` default with `rustls` |
-| HTTP/3 support | 🔲 | Via `hyper` + `quiche` or `h3` |
-| GraphQL — query + variables + schema introspection | 🔲 | |
-| gRPC — unary calls + service reflection | 🔲 | |
-| gRPC — server/client/bidi streaming | 🔲 | |
-| WebSocket — connect, send frames, stream events | 🔲 | `tokio-tungstenite` |
+| HTTP/2 support | ✅ Done | `reqwest` default with `rustls` |
+| HTTP/3 support | 🔲 | Via `hyper` + `quiche` |
+| GraphQL — query + variables | ✅ Done | Body type wired; schema introspection pending |
+| GraphQL schema introspection | 🔲 | |
+| gRPC — unary calls | 🔲 | |
+| gRPC — streaming | 🔲 | |
+| WebSocket — connect, send frames, stream | 🔲 | `tokio-tungstenite` |
 | SSE — Server-Sent Events streaming | 🔲 | |
-| Proxy settings per environment | 🔲 | HTTP + SOCKS5 |
+| Proxy settings per environment | 🔲 | |
 | SSL/TLS toggle per request | 🔲 | |
 | Client certificates | 🔲 | |
-| Follow redirects (configurable) | 🔲 | |
-| Request timeout (configurable) | 🔲 | |
+| Follow redirects (configurable) | ✅ Done | `follow_redirects: true` in payload |
+| Request timeout (configurable) | ✅ Done | `timeout_ms: 30000` in payload |
 
 ### Template Tag Engine (Insomnia-style)
 | Task | Status | Notes |
 |---|---|---|
-| `{% uuid %}` | 🔲 | |
-| `{% timestamp %}` | 🔲 | |
-| `{% now 'iso' %}` | 🔲 | |
-| `{% randomInt %}` | 🔲 | |
-| `{% randomEmail %}`, `{% randomName %}`, `{% randomPhone %}` | 🔲 | |
-| `{% base64 %}`, `{% hash %}` | 🔲 | |
+| `{% uuid %}` / `{% guid %}` | ✅ Done | `template-tags.ts` |
+| `{% timestamp %}` | ✅ Done | |
+| `{% now 'iso' %}` / `'unix'` / `'ms'` | ✅ Done | |
+| `{% randomInt min max %}` | ✅ Done | |
+| `{% randomEmail %}` | ✅ Done | |
+| `{% randomName %}` | ✅ Done | |
+| `{% randomPhone %}` | ✅ Done | |
+| `{% randomWord %}` | ✅ Done | |
+| `{% randomBoolean %}` | ✅ Done | |
+| `{% randomLoremIpsum %}` | ✅ Done | |
+| `{% base64 encode/decode val %}` | ✅ Done | |
+| `{% env 'VAR' %}` | ✅ Done | |
 | `{% response 'body', '$.path' %}` — request chaining | 🔲 | Key Insomnia feature |
-| `{% response 'header', 'X-Token', 'request-name' %}` | 🔲 | |
-| `{% env 'VAR' %}` — OS env var | 🔲 | |
 | `{% file '/path' %}` | 🔲 | |
-| `{% prompt 'label' %}` — ask user at send-time | 🔲 | |
-| `{{$randomEmail}}` etc. — Postman `$` syntax compat | 🔲 | Postman compatibility |
+| `{% prompt 'label' %}` | 🔲 | |
+| `{{$guid}}`, `{{$timestamp}}`, `{{$isoTimestamp}}` — Postman `$` compat | ✅ Done | `resolvePostmanDynamic()` |
+| `{{$randomEmail}}`, `{{$randomBoolean}}`, `{{$randomFullName}}` | ✅ Done | |
+| `{{$randomPhoneNumber}}`, `{{$randomWord}}` | ✅ Done | |
+| `{{var}}` — environment variable substitution | ✅ Done | |
+| Template resolution wired into `sendRequest()` | ✅ Done | `resolveRequestTemplates()` called on full payload |
 
 ### Variable Scoping (Postman 4-level system)
 | Task | Status | Notes |
 |---|---|---|
+| Environment variables (`.parallax/environments/*.json`) | ✅ Done | Load/save/edit working |
+| Local variables (ephemeral, set by scripts) | ✅ Done | `pm.environment.set()` in script runner |
 | Global variables | 🔲 | Shared across all projects |
 | Collection variables | 🔲 | Per-collection YAML header |
-| Environment variables | 🔲 | `.parallax/environments/*.json` |
-| Local variables (ephemeral, set by scripts) | 🔲 | |
-| Resolution priority: Local > Env > Collection > Global | 🔲 | |
+| Resolution priority: Local > Env > Collection > Global | 🔲 | Full 4-level pending |
 
 ### Script Runner (Postman `pm.*` API)
 | Task | Status | Notes |
 |---|---|---|
-| Choose JS runtime (Deno core vs. QuickJS) | 🔲 | Decision pending |
-| `pm.environment.get/set/unset` | 🔲 | |
-| `pm.globals.get/set/unset` | 🔲 | |
-| `pm.collectionVariables.get/set` | 🔲 | |
-| `pm.request` — access/modify pre-send | 🔲 | |
-| `pm.response` — access in test scripts | 🔲 | |
-| `pm.test(name, fn)` — named assertions | 🔲 | |
-| `pm.expect` — Chai-style assertions | 🔲 | |
-| `pm.sendRequest(options, callback)` | 🔲 | |
-| Script timeout (10s default) | 🔲 | |
-| Python runtime stub (PyO3) | 🔲 | Full in Phase 2 |
+| JS runtime — sandboxed `new Function()` | ✅ Done | No native dep needed; safe for local tool |
+| `pm.environment.get/set/unset/has` | ✅ Done | `pm-script-runner.ts` |
+| `pm.globals.get/set/unset` | ✅ Done | Aliased to environment for now |
+| `pm.response.code/status/responseTime/responseSize` | ✅ Done | |
+| `pm.response.json()` / `pm.response.text()` | ✅ Done | |
+| `pm.response.headers.get(name)` | ✅ Done | |
+| `pm.test(name, fn)` — named assertions | ✅ Done | |
+| `pm.expect(val).to.equal/eql` | ✅ Done | |
+| `pm.expect(val).to.be.ok/above/below/a/string/number` | ✅ Done | |
+| `pm.expect(val).to.include/have.property/have.length` | ✅ Done | |
+| `pm.expect(val).to.have.status/header` | ✅ Done | |
+| `pm.expect(val).not.equal/include` | ✅ Done | |
+| Pre-request script runs before HTTP call | ✅ Done | |
+| Test script runs after response received | ✅ Done | |
+| `pm.sendRequest()` | 🔲 | |
+| Python runtime (PyO3) | 🔲 | Phase 2 |
 
 ### Persistence & Import/Export
 | Task | Status | Notes |
 |---|---|---|
-| `load_collection` — reads YAML | ✅ Done | |
-| `save_collection` — writes YAML | ✅ Done | |
+| `list_collections` — YAML | ✅ Done | |
+| `load_collection` — YAML | ✅ Done | |
+| `save_collection` — YAML | ✅ Done | |
+| `delete_collection` | ✅ Done | |
 | `list_environments` | ✅ Done | |
-| `load_environment` with variable scoping | 🔲 | |
-| `save_environment` | 🔲 | |
-| Import from Postman Collection v2.1 JSON | 🔲 | Must-have (Insomnia has this) |
-| Import from curl command | 🔲 | Must-have (both tools have this) |
-| Import from OpenAPI 3.x (stub) | 🔲 | Full in Phase 4 |
+| `load_environment` | ✅ Done | |
+| `save_environment` | ✅ Done | |
+| `save_history_entry` — JSON to `.parallax/history/` | ✅ Done | Per-request timestamped files |
+| Response history in-memory (capped 200) | ✅ Done | `responseHistory` store |
+| Import from Postman Collection v2.1 JSON | ✅ Done | `postman-importer.ts` — requests, folders, auth, body |
+| Import from Insomnia v4 export JSON | ✅ Done | `importInsomniaExport()` |
+| Import from curl command (URL bar paste) | ✅ Done | `parseCurl()` — method, headers, body, Bearer |
+| Import from OpenAPI 3.x | 🔲 | Phase 4 |
 | Import from HAR file | 🔲 | |
-| Export as Postman JSON | 🔲 | For teams still on Postman |
-| Response history — save to `.parallax/history/` | 🔲 | |
+| Export as Postman JSON | 🔲 | |
 
 ### Cookie Jar
 | Task | Status | Notes |
 |---|---|---|
-| Cookie store (`.parallax/cookies/jar.json`) | 🔲 | |
+| Cookie store (`reqwest` `cookie_store(true)`) | ✅ Done | Rust engine has it enabled |
 | Cookie manager UI | 🔲 | |
 | Per-request opt-in/opt-out | 🔲 | |
 | Session cookies expire on restart | 🔲 | |
@@ -115,40 +136,48 @@ Phase 5  ░░░░░░░░░░░░░░░░░░░░   0%  🔲
 | Task | Status | Notes |
 |---|---|---|
 | Bearer token | ✅ Done | |
-| Basic auth | 🔲 | |
-| API key (header / query param) | 🔲 | |
+| Basic auth | ✅ Done | |
+| API key (header) | ✅ Done | |
+| API key (query param) | 🔲 | |
+| Ecosystem provider selector UI | ✅ Done | Frappe, Django, Laravel, Rails, WordPress, FastAPI |
 | Frappe sid + CSRF (stub) | ✅ Done | Full in Phase 4 |
 | Django CSRF (stub) | ✅ Done | Full in Phase 4 |
+| OAuth2 (full) | 🔲 | Phase 4 |
+| AWS Signature v4 | 🔲 | Phase 4 |
 
 ### Svelte 5 Builder Mode UI
 | Task | Status | Notes |
 |---|---|---|
 | App shell / layout (Builder + Dashboard + Design modes) | ✅ Done | |
 | Method selector | ✅ Done | |
-| URL bar with template tag autocomplete | ✅ Done | |
-| Params tab | 🔲 | |
-| Headers tab (key-value + bulk edit) | ✅ Done | |
-| Auth tab with provider selector | 🔲 | |
-| Body tab — JSON, XML, form-data, URL-encoded, binary, GraphQL | ✅ Done | |
-| Scripts tab — pre-request + test editor | 🔲 | |
-| Settings tab — timeout, redirects, proxy, SSL | 🔲 | |
-| GraphQL pane (query editor, variables, schema explorer) | 🔲 | |
+| URL bar | ✅ Done | |
+| Params tab (key-value editor) | ✅ Done | |
+| Headers tab (key-value editor) | ✅ Done | |
+| Auth tab with all provider sub-forms | ✅ Done | Bearer/Basic/API Key/Ecosystem |
+| Body tab — JSON, form-data, URL-encoded, raw, GraphQL | ✅ Done | |
+| Scripts tab — Pre-request editor | ✅ Done | Real textarea with syntax hint |
+| Scripts tab — Tests editor | ✅ Done | Real textarea with syntax hint |
 | Response pane — status, time, size | ✅ Done | |
-| Response body — JSON tree, XML, HTML, raw, hex | ✅ Done | |
+| Response body — JSON tree (colorized), raw | ✅ Done | |
 | Response headers tab | ✅ Done | |
+| Response tests tab (pass/fail per `pm.test()`) | ✅ Done | |
+| Response history tab (scrollable, click to view) | ✅ Done | |
 | Response cookies tab | 🔲 | |
-| Response tests tab (pass/fail list) | 🔲 | |
 | Response visualize tab (Postman Visualizer) | 🔲 | Phase 2 |
-| Response history dropdown | 🔲 | |
-| Collection sidebar tree view | ✅ Done | |
+| Collection sidebar — tree view (collections → folders → requests) | ✅ Done | |
+| Sidebar — search/filter | ✅ Done | Real-time `$derived.by()` filter |
+| Sidebar — method badges (color-coded) | ✅ Done | |
+| Sidebar — import button (Postman / Insomnia) | ✅ Done | File picker, auto-detects format |
+| Sidebar — git branch chip | ✅ Done | Shows current branch from workspace |
 | Sidebar drag-and-drop reordering | 🔲 | |
 | Sidebar right-click context menu | 🔲 | |
-| Sidebar search/filter | 🔲 | |
-| Sidebar method badges | 🔲 | |
-| Environment selector dropdown | ✅ Done | |
-| Environment quick-edit overlay | 🔲 | |
+| Environment quick-edit overlay | ✅ Done | `EnvironmentPanel.svelte` |
+| Environment variable count badge | ✅ Done | |
+| Secret masking in env editor | ✅ Done | Per-variable eye toggle |
 | Environment diff view | 🔲 | |
-| Secret masking in env viewer | 🔲 | |
+| Multi-tab UI | ✅ Done | Tabs store, create/switch/close |
+| Tabs persist across restarts | 🔲 | |
+| Split view | 🔲 | |
 
 ### Go Sidecar
 | Task | Status | Notes |
@@ -156,22 +185,26 @@ Phase 5  ░░░░░░░░░░░░░░░░░░░░   0%  🔲
 | `src-go/main.go` gRPC server stub | ✅ Done | |
 | File watcher stub | ✅ Done | |
 | Health check ping endpoint | ✅ Done | |
-| Go binary compiled and bundled | ❌ Blocked | Not compiled yet |
-| IPC ping from Rust working | ❌ Blocked | Depends on binary |
+| Go binary compiled and bundled | ✅ Done | Running on :50151 |
+| IPC ping from Rust working | 🔲 | sidecar starts but ping not wired yet |
 
 ### Phase 1 Success Criteria
 | Criteria | Status |
 |---|---|
-| `cargo tauri dev` launches without errors | ❌ |
-| REST, GraphQL, WebSocket requests work | ❌ |
-| Template tags resolve at send-time | ❌ |
-| Pre-request and test scripts execute with `pm` API | ❌ |
-| Variable scoping resolves across 4 levels | ❌ |
-| Cookie jar persists between requests | ❌ |
-| Collections load from and save to `.parallax/` | ❌ |
-| Import a Postman Collection JSON | ❌ |
-| Import a curl command | ❌ |
-| Response history saves and timeline works | ❌ |
+| `cargo tauri dev` launches without errors | ✅ |
+| REST requests work end-to-end | ✅ |
+| Template tags resolve at send-time | ✅ |
+| Pre-request and test scripts execute with `pm` API | ✅ |
+| Variable scoping (env + local via scripts) | ✅ |
+| Cookie jar active in reqwest | ✅ (no UI yet) |
+| Collections load from and save to `.parallax/` | ✅ |
+| Import a Postman Collection JSON | ✅ |
+| Import from Insomnia export | ✅ |
+| Import a curl command | ✅ |
+| Response history saves in-memory + to disk | ✅ |
+| GraphQL, WebSocket requests work | ❌ (GraphQL body only; no WS/SSE yet) |
+| Variable scoping resolves across all 4 levels | ❌ (2/4 levels done) |
+| Cookie jar has management UI | ❌ |
 | Go sidecar responds to ping | ❌ |
 
 ---
@@ -212,7 +245,7 @@ Phase 5  ░░░░░░░░░░░░░░░░░░░░   0%  🔲
 ### Dashboard Mode
 | Task | Status |
 |---|---|
-| Dashboard Mode UI shell | 🔲 |
+| Dashboard Mode UI shell | ✅ Done (stub) |
 | Live Traffic Stream panel | 🔲 |
 | Health Heatmap panel | 🔲 |
 | Load Test Results panel | 🔲 |
@@ -324,7 +357,7 @@ Phase 5  ░░░░░░░░░░░░░░░░░░░░   0%  🔲
 | `parallax.start_mock(...)` | 🔲 |
 | Local auth token for MCP clients | 🔲 |
 
-### Documentation Generator (Postman Cloud Docs — local)
+### Documentation Generator
 | Task | Status |
 |---|---|
 | Static HTML doc site generator | 🔲 |
@@ -354,7 +387,7 @@ Phase 5  ░░░░░░░░░░░░░░░░░░░░   0%  🔲
 | Generic OAuth2 (code + PKCE + client_credentials + password) | 🔲 |
 | AWS Signature v4 | 🔲 |
 | Digest Auth | 🔲 |
-| NTLM / Negotiate | 🔲 |
+| NTLLM / Negotiate | 🔲 |
 | mTLS (client certificate) | 🔲 |
 
 ### Schema Explorer (Go)
@@ -363,14 +396,14 @@ Phase 5  ░░░░░░░░░░░░░░░░░░░░   0%  🔲
 | Frappe DocType explorer | 🔲 |
 | Frappe `@whitelist()` method scanner | 🔲 |
 | Django URL + DRF ViewSet explorer | 🔲 |
-| Laravel route explorer (`artisan route:list` + file parse) | 🔲 |
+| Laravel route explorer | 🔲 |
 | Rails routes.rb + schema.rb explorer | 🔲 |
 | FastAPI decorator scanner | 🔲 |
 | Express.js / Fastify route scanner | 🔲 |
 | OpenAPI 3.x full importer | 🔲 |
 | Framework auto-detection on folder open | 🔲 |
 
-### Design Mode (Insomnia OpenAPI editor — improved)
+### Design Mode (OpenAPI Editor)
 | Task | Status |
 |---|---|
 | Design Mode UI shell | 🔲 |
@@ -379,47 +412,42 @@ Phase 5  ░░░░░░░░░░░░░░░░░░░░   0%  🔲
 | Rendered docs preview (right pane) | 🔲 |
 | OpenAPI keyword autocomplete | 🔲 |
 | Schema builder UI (form-based) | 🔲 |
-| "Try it out" — execute from spec preview | 🔲 |
+| "Try it out" — execute from spec | 🔲 |
 | Sync spec → collection | 🔲 |
 | Sync collection → spec | 🔲 |
 | Spec lint (style rules) | 🔲 |
-| Save as `.parallax/design/*.openapi.yaml` | 🔲 |
 
 ### Response Intelligence
 | Task | Status |
 |---|---|
 | Response shape inference engine | 🔲 |
-| Schema confidence tracking | 🔲 |
 | Export as JSON Schema | 🔲 |
 | Export as TypeScript interface | 🔲 |
 | Export as Pydantic model | 🔲 |
 | Export as Rust struct | 🔲 |
 | Export as Go struct | 🔲 |
-| Schema stored in `.parallax/schemas/` | 🔲 |
 
-### Visual Flow Builder (Postman Flows equivalent)
+### Visual Flow Builder
 | Task | Status |
 |---|---|
 | Canvas-based editor UI | 🔲 |
 | Request node | 🔲 |
-| Condition node (branch) | 🔲 |
-| Transform node (extract/reshape) | 🔲 |
-| Loop node (iterate over array) | 🔲 |
+| Condition node | 🔲 |
+| Transform node | 🔲 |
+| Loop node | 🔲 |
 | Delay node | 🔲 |
 | Variable node | 🔲 |
 | Flow execution via Collection Runner | 🔲 |
-| Save as `.parallax/flows/*.yaml` | 🔲 |
 
 ### Enhanced Protocol Support
 | Task | Status |
 |---|---|
-| gRPC service reflection (auto-discover methods) | 🔲 |
+| gRPC service reflection | 🔲 |
 | GraphQL schema explorer (full type browser) | 🔲 |
 | GraphQL field autocomplete | 🔲 |
-| GraphQL query builder (click to build) | 🔲 |
+| GraphQL query builder | 🔲 |
 | GraphQL subscription support | 🔲 |
 | GraphQL schema diff | 🔲 |
-| GraphQL persisted queries | 🔲 |
 
 ---
 
@@ -443,7 +471,7 @@ Phase 5  ░░░░░░░░░░░░░░░░░░░░   0%  🔲
 |---|---|
 | Plugin API (`onRequest`, `onResponse`, etc.) | 🔲 |
 | Plugin loader (from `~/.config/parallax/plugins/`) | 🔲 |
-| Plugin sandbox (no direct fs/network access) | 🔲 |
+| Plugin sandbox | 🔲 |
 | `parallax-cli plugin install` | 🔲 |
 | Plugin registry site | 🔲 |
 | parallax-plugin-faker | 🔲 |
@@ -481,7 +509,7 @@ Phase 5  ░░░░░░░░░░░░░░░░░░░░   0%  🔲
 ### Multi-window & Tabs
 | Task | Status |
 |---|---|
-| Multi-tab UI | 🔲 |
+| Multi-tab UI | ✅ Done (Phase 1) |
 | Tabs persist across restarts | 🔲 |
 | Split view (two requests side-by-side) | 🔲 |
 | Detach tab to separate window | 🔲 |
@@ -490,14 +518,12 @@ Phase 5  ░░░░░░░░░░░░░░░░░░░░   0%  🔲
 ### Themes
 | Task | Status |
 |---|---|
-| Parallax Dark (default) finalized | 🔲 |
+| Parallax Dark (default) | ✅ Done (Phase 1) |
 | Parallax Light | 🔲 |
-| High Contrast Dark | 🔲 |
-| High Contrast Light | 🔲 |
+| High Contrast Dark/Light | 🔲 |
 | Monokai | 🔲 |
 | Solarized Dark/Light | 🔲 |
 | Custom CSS override (`theme.css`) | 🔲 |
-| Full CSS custom property exposure | 🔲 |
 
 ### Distribution
 | Task | Status |
@@ -536,9 +562,10 @@ Phase 5  ░░░░░░░░░░░░░░░░░░░░   0%  🔲
 
 | Blocker | Impact | Priority |
 |---|---|---|
-| `cargo check` fails — `generate_context!()` macro expansion error | Blocks app launch | 🔴 P0 |
-| Go binary not compiled | Blocks IPC, sidecar, CLI features | 🟡 P1 |
-| JS runtime not chosen (Deno core vs. QuickJS) | Blocks script runner, template tags | 🟡 P1 |
+| WebSocket / SSE not implemented in Rust engine | Blocks WS/SSE request types | 🟡 P1 |
+| Cookie manager UI missing | Cookies work in reqwest but not inspectable | 🟡 P1 |
+| Global + collection variable scopes not implemented | Only env + local vars work | 🟡 P1 |
+| Go sidecar IPC ping not wired from Rust | Sidecar starts but no handshake | 🟢 P2 |
 | Icon files are placeholder PNGs | Cosmetic only | 🟢 P2 |
 
 ---
@@ -547,11 +574,15 @@ Phase 5  ░░░░░░░░░░░░░░░░░░░░   0%  🔲
 
 | Date | Decision | Reason |
 |---|---|---|
-| 2026-04-21 | Manual scaffold instead of `npm create tauri-app` | CLI command was hanging; manual gives full control |
-| 2026-04-21 | `externalBin` removed from tauri.conf.json during dev | Go binary not compiled yet — re-add when sidecar is ready |
+| 2026-04-21 | Manual scaffold instead of `npm create tauri-app` | CLI was hanging; manual gives full control |
 | 2026-04-21 | Frappe auth → Framework-agnostic auth provider system | All users need auth handling, not just Frappe users |
 | 2026-04-21 | `--legacy-peer-deps` for npm install | Peer dep conflict between Svelte 5 and some dev tools |
-| 2026-04-21 | Include ALL Postman + Insomnia must-haves, not just gaps | Parallax is not a "better Postman" — it is both tools unified |
+| 2026-04-21 | Include ALL Postman + Insomnia must-haves, not just gaps | Parallax is both tools unified, not a "better Postman" |
+| 2026-04-21 | Tauri shell plugin `all`/`execute`/`sidecar` fields removed | Tauri v2 only supports `open` in `plugins.shell` |
+| 2026-04-21 | Go sidecar non-fatal on startup failure | Allows `cargo tauri dev` to work before binary is compiled |
+| 2026-04-22 | Script runner uses `new Function()` sandbox | No native dep; sufficient for local trusted tool; revisit if multi-user |
+| 2026-04-22 | Postman + Insomnia import in TypeScript (not Rust) | Runs in renderer, no IPC round-trip needed for parsing |
+| 2026-04-22 | Response history capped at 200 in-memory entries | Prevents memory growth; disk persistence via `save_history_entry` |
 
 ---
 

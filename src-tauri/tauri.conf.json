@@ -30,13 +30,13 @@
   },
   "bundle": {
     "active": true,
-    "targets": "all"
+    "targets": "all",
+    "externalBin": [
+      "binaries/parallax-worker"
+    ]
   },
   "plugins": {
     "shell": {
-      "all": false,
-      "execute": true,
-      "sidecar": true,
       "open": "^https?://"
     }
   }

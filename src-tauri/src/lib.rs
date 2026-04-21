@@ -4,7 +4,6 @@ pub mod auth_providers;
 pub mod schema_explorer;
 pub mod commands;
 
-use tauri::Manager;
 use tauri_plugin_shell::ShellExt;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -23,6 +22,7 @@ pub fn run() {
             commands::collections::load_collection,
             commands::collections::save_collection,
             commands::collections::delete_collection,
+            commands::collections::save_history_entry,
             // Environments
             commands::environments::list_environments,
             commands::environments::load_environment,

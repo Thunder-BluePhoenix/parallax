@@ -1,11 +1,9 @@
 <script lang="ts">
-  import { tabs, activeRequest, responseState, sendRequest, appMode } from "../../stores/app.svelte";
+  import { tabs, activeRequest, responseState, sendRequest } from "../../stores/app.svelte";
   import RequestPanel from "./RequestPanel.svelte";
   import ResponsePanel from "./ResponsePanel.svelte";
-  import AuthPanel from "../EcosystemIntegrations/AuthPanel.svelte";
 
-  let activeTab = $state("params"); // params | headers | body | auth
-  let showAuth = $state(false);
+  let activeTab = $state("params");
 
   const METHODS = ["GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"] as const;
 
@@ -23,13 +21,6 @@
       tabs.activeId = tabs.list[Math.max(0, idx - 1)].id;
     }
   }
-
-  function statusClass(code: number) {
-    if (code >= 500) return "status-5xx";
-    if (code >= 400) return "status-4xx";
-    if (code >= 300) return "status-3xx";
-    return "status-2xx";
-  }
 </script>
 
 <svelte:window on:keydown={onKeydown} />
@@ -39,10 +30,14 @@
   <div class="tab-row">
     <div class="tab-scroll scroll-y">
       {#each tabs.list as tab}
-        <button
+        <div
           class="req-tab"
           class:active={tabs.activeId === tab.id}
+          role="tab"
+          tabindex="0"
+          aria-selected={tabs.activeId === tab.id}
           onclick={() => (tabs.activeId = tab.id)}
+          onkeydown={(e) => e.key === "Enter" && (tabs.activeId = tab.id)}
         >
           <span class="method-badge method-{tab.method}">{tab.method}</span>
           <span class="tab-name">{tab.name}</span>
@@ -50,7 +45,7 @@
             <span class="modified-dot" title="Unsaved"></span>
           {/if}
           <button class="close-btn" onclick={(e) => closeTab(tab.id, e)}>×</button>
-        </button>
+        </div>
       {/each}
     </div>
 

@@ -1,41 +1,94 @@
 <script lang="ts">
   import { invoke } from "@tauri-apps/api/core";
   import { open } from "@tauri-apps/plugin-dialog";
-  import { tabs, activeRequest, currentWorkspace, appMode } from "../../stores/app.svelte";
+  import {
+    tabs, activeRequest, currentWorkspace, appMode,
+    loadedCollections, activeEnvironment, loadRequestIntoTab,
+    type Collection, defaultAuth,
+  } from "../../stores/app.svelte";
+  import EnvironmentPanel from "./EnvironmentPanel.svelte";
 
-  let collections = $state<string[]>([]);
-  let expanded = $state<Record<string, boolean>>({ "Collections": true });
+  let searchQuery   = $state("");
+  let showEnvPanel  = $state(false);
+  let expandedCols  = $state<Record<string, boolean>>({});
+  let expandedFolders = $state<Record<string, boolean>>({});
 
+  // ── Filtered view of requests across all collections ──────
+  let filteredCollections = $derived.by(() => {
+    const q = searchQuery.toLowerCase().trim();
+    if (!q) return loadedCollections;
+    return loadedCollections.map((col) => ({
+      ...col,
+      requests: col.requests.filter(
+        (r) => r.name.toLowerCase().includes(q) || r.url.toLowerCase().includes(q)
+      ),
+      folders: col.folders.map((f) => ({
+        ...f,
+        requests: f.requests.filter(
+          (r) => r.name.toLowerCase().includes(q) || r.url.toLowerCase().includes(q)
+        ),
+      })).filter((f) => f.requests.length > 0),
+    })).filter((c) => c.requests.length > 0 || c.folders.length > 0);
+  });
+
+  // ── Open workspace folder ──────────────────────────────────
   async function openWorkspace() {
     const selected = await open({ directory: true, multiple: false, title: "Open Workspace" });
-    if (!selected) return;
+    if (!selected || typeof selected !== "string") return;
+
     const info: any = await invoke("open_workspace", { path: selected });
-    currentWorkspace.path = info.root;
-    currentWorkspace.name = info.name;
+    currentWorkspace.path      = info.root;
+    currentWorkspace.name      = info.name;
     currentWorkspace.gitBranch = info.git_branch;
     currentWorkspace.hasParallax = info.has_parallax;
 
-    collections = await invoke("list_collections", { workspace: selected });
+    await loadCollections(selected);
   }
 
+  async function loadCollections(workspace: string) {
+    const names: string[] = await invoke("list_collections", { workspace });
+    const collections: Collection[] = [];
+    for (const name of names) {
+      try {
+        const col: Collection = await invoke("load_collection", { workspace, name });
+        collections.push(col);
+        expandedCols[col.name] = true; // auto-expand first load
+      } catch { /* skip malformed */ }
+    }
+    loadedCollections.splice(0, loadedCollections.length, ...collections);
+  }
+
+  // ── New blank request ──────────────────────────────────────
   function newRequest() {
     const id = crypto.randomUUID();
     tabs.list.push({ id, name: "New Request", method: "GET", modified: false });
     tabs.activeId = id;
-    activeRequest.id = id;
-    activeRequest.name = "New Request";
-    activeRequest.method = "GET";
-    activeRequest.url = "";
+    activeRequest.id          = id;
+    activeRequest.name        = "New Request";
+    activeRequest.method      = "GET";
+    activeRequest.url         = "";
+    activeRequest.headers     = {};
+    activeRequest.params      = {};
+    activeRequest.bodyType    = "none";
+    activeRequest.bodyContent = "";
+    activeRequest.auth        = defaultAuth();
   }
 
-  function toggle(section: string) {
-    expanded[section] = !expanded[section];
+  function toggleCol(name: string) {
+    expandedCols[name] = !expandedCols[name];
+  }
+  function toggleFolder(key: string) {
+    expandedFolders[key] = !expandedFolders[key];
   }
 
-  const navItems = [
-    { icon: "builder", label: "Builder", mode: "builder" },
-    { icon: "dashboard", label: "Dashboard", mode: "dashboard" },
-  ] as const;
+  function methodColor(m: string) {
+    const map: Record<string, string> = {
+      GET: "method-GET", POST: "method-POST", PUT: "method-PUT",
+      PATCH: "method-PATCH", DELETE: "method-DELETE",
+      HEAD: "method-HEAD", OPTIONS: "method-OPTIONS",
+    };
+    return map[m.toUpperCase()] ?? "method-GET";
+  }
 </script>
 
 <aside class="sidebar">
@@ -45,13 +98,19 @@
       <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
         <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
       </svg>
-      <span>{currentWorkspace.name || "Open Workspace"}</span>
+      <span class="ws-name">{currentWorkspace.name || "Open Workspace"}</span>
+      {#if currentWorkspace.gitBranch}
+        <span class="git-chip">
+          <svg width="9" height="9" viewBox="0 0 16 16" fill="currentColor">
+            <path d="M11.75 2.5a.75.75 0 1 0 1.5 0 .75.75 0 0 0-1.5 0zm.75 2.25a2.25 2.25 0 1 1-1.5-2.121V6A2.5 2.5 0 0 1 8.5 8.5h-3a1 1 0 0 0-1 1v1.379a2.251 2.251 0 1 1-1.5 0V9.5a2.5 2.5 0 0 1 2.5-2.5h3a1 1 0 0 0 1-1V4.629A2.251 2.251 0 0 1 12.5 4.75z"/>
+          </svg>
+          {currentWorkspace.gitBranch}
+        </span>
+      {/if}
     </button>
-
-    <button class="icon-btn" onclick={newRequest} title="New Request">
+    <button class="icon-btn" onclick={newRequest} title="New Request (Ctrl+N)">
       <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-        <line x1="12" y1="5" x2="12" y2="19"></line>
-        <line x1="5" y1="12" x2="19" y2="12"></line>
+        <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
       </svg>
     </button>
   </div>
@@ -61,83 +120,129 @@
     <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="search-icon">
       <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
     </svg>
-    <input type="text" placeholder="Search requests..." class="search-input" />
+    <input type="text" placeholder="Search requests…" class="search-input" bind:value={searchQuery} />
+    {#if searchQuery}
+      <button class="clear-search" onclick={() => (searchQuery = "")}>×</button>
+    {/if}
   </div>
 
   <!-- Collections tree -->
   <div class="scroll-y sidebar-tree">
-    <div class="tree-section">
-      <button class="tree-section-header" onclick={() => toggle("Collections")}>
-        <svg class="chevron" class:open={expanded["Collections"]} width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-          <polyline points="9 18 15 12 9 6"/>
-        </svg>
-        <span>Collections</span>
-        <span class="count">{collections.length}</span>
-      </button>
-
-      {#if expanded["Collections"]}
-        {#if collections.length === 0}
-          <div class="empty-tree">
-            <span>No collections yet</span>
-            <button class="link-btn" onclick={newRequest}>Create one →</button>
-          </div>
+    {#if loadedCollections.length === 0}
+      <div class="empty-state">
+        {#if currentWorkspace.path}
+          <p>No collections in this workspace.</p>
+          <button class="link-btn" onclick={newRequest}>Create a request →</button>
         {:else}
-          {#each collections as col}
-            <button class="tree-item">
-              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
-                <polyline points="14 2 14 8 20 8"/>
-              </svg>
-              {col}
+          <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" opacity="0.3">
+            <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
+          </svg>
+          <p>Open a workspace to see collections.</p>
+          <button class="link-btn" onclick={openWorkspace}>Open folder →</button>
+        {/if}
+      </div>
+    {:else}
+      {#each filteredCollections as col}
+        <!-- Collection header -->
+        <button
+          class="col-header"
+          onclick={() => toggleCol(col.name)}
+          title={col.description ?? col.name}
+        >
+          <svg
+            class="chevron"
+            class:open={expandedCols[col.name]}
+            width="10" height="10" viewBox="0 0 24 24"
+            fill="none" stroke="currentColor" stroke-width="2.5"
+          >
+            <polyline points="9 18 15 12 9 6"/>
+          </svg>
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="col-icon">
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+            <polyline points="14 2 14 8 20 8"/>
+          </svg>
+          <span class="col-name">{col.name}</span>
+          <span class="count">{col.requests.length + col.folders.reduce((n,f)=>n+f.requests.length,0)}</span>
+        </button>
+
+        {#if expandedCols[col.name]}
+          <!-- Top-level requests -->
+          {#each col.requests as req}
+            <button
+              class="req-item"
+              class:active={tabs.activeId === req.id}
+              onclick={() => { loadRequestIntoTab(req); appMode.value = "builder"; }}
+            >
+              <span class="method-badge {methodColor(req.method)}">{req.method}</span>
+              <span class="req-name">{req.name}</span>
             </button>
           {/each}
+
+          <!-- Folders -->
+          {#each col.folders as folder}
+            {@const fkey = col.name + "/" + folder.name}
+            <button class="folder-header" onclick={() => toggleFolder(fkey)}>
+              <svg class="chevron sm" class:open={expandedFolders[fkey]}
+                width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                <polyline points="9 18 15 12 9 6"/>
+              </svg>
+              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
+              </svg>
+              <span class="folder-name">{folder.name}</span>
+              <span class="count sm">{folder.requests.length}</span>
+            </button>
+            {#if expandedFolders[fkey]}
+              {#each folder.requests as req}
+                <button
+                  class="req-item nested"
+                  class:active={tabs.activeId === req.id}
+                  onclick={() => { loadRequestIntoTab(req); appMode.value = "builder"; }}
+                >
+                  <span class="method-badge {methodColor(req.method)}">{req.method}</span>
+                  <span class="req-name">{req.name}</span>
+                </button>
+              {/each}
+            {/if}
+          {/each}
         {/if}
-      {/if}
-    </div>
+      {/each}
+    {/if}
 
-    <div class="tree-section">
-      <button class="tree-section-header" onclick={() => toggle("Ecosystem")}>
-        <svg class="chevron" class:open={expanded["Ecosystem"]} width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-          <polyline points="9 18 15 12 9 6"/>
-        </svg>
-        <span>Ecosystem</span>
-      </button>
-
-      {#if expanded["Ecosystem"]}
-        <button class="tree-item ecosystem-item" onclick={() => appMode.value = "dashboard"}>
-          <span class="eco-badge frappe">F</span>
-          Frappe Auth
-        </button>
-        <button class="tree-item ecosystem-item">
-          <span class="eco-badge django">D</span>
-          Django Auth
-        </button>
-        <button class="tree-item ecosystem-item">
-          <span class="eco-badge openapi">API</span>
-          Schema Explorer
-        </button>
-      {/if}
-    </div>
+    <!-- Ecosystem section -->
+    <div class="section-sep"></div>
+    <button class="col-header eco" onclick={() => (appMode.value = "dashboard")}>
+      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/>
+        <rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/>
+      </svg>
+      <span class="col-name">Dashboard</span>
+    </button>
   </div>
 
-  <!-- Bottom nav -->
+  <!-- Env indicator + footer -->
   <div class="sidebar-footer">
-    <button class="footer-btn" title="Environments">
-      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+    <button
+      class="env-btn"
+      class:active={showEnvPanel}
+      onclick={() => (showEnvPanel = !showEnvPanel)}
+      title="Environment variables"
+    >
+      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
         <circle cx="12" cy="12" r="3"/>
         <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/>
       </svg>
-      Environments
-    </button>
-    <button class="footer-btn" title="History">
-      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-        <polyline points="12 8 12 12 14 14"/>
-        <path d="M3.05 11a9 9 0 1 0 .5-4.5"/>
-        <polyline points="3 3 3 11 11 11"/>
-      </svg>
-      History
+      <span class="env-name">{activeEnvironment.name}</span>
+      {#if Object.keys(activeEnvironment.variables).length > 0}
+        <span class="env-count">{Object.keys(activeEnvironment.variables).length}</span>
+      {/if}
     </button>
   </div>
+
+  <!-- Environment panel overlay -->
+  {#if showEnvPanel}
+    <EnvironmentPanel onclose={() => (showEnvPanel = false)} />
+  {/if}
 </aside>
 
 <style>
@@ -149,21 +254,24 @@
     flex-direction: column;
     flex-shrink: 0;
     overflow: hidden;
+    position: relative;
   }
 
+  /* Header */
   .sidebar-header {
     display: flex;
     align-items: center;
     gap: 4px;
-    padding: 8px 10px;
+    padding: 8px 8px 8px 10px;
     border-bottom: 1px solid var(--border-subtle);
+    flex-shrink: 0;
   }
 
   .workspace-btn {
     flex: 1;
     display: flex;
     align-items: center;
-    gap: 7px;
+    gap: 6px;
     background: transparent;
     color: var(--text-secondary);
     font-size: 12px;
@@ -173,24 +281,43 @@
     text-align: left;
     overflow: hidden;
     transition: var(--transition-fast);
-    white-space: nowrap;
-    text-overflow: ellipsis;
   }
   .workspace-btn:hover { background: var(--bg-elevated); color: var(--text-primary); }
 
+  .ws-name {
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .git-chip {
+    display: flex;
+    align-items: center;
+    gap: 3px;
+    font-size: 10px;
+    font-family: var(--font-mono);
+    color: var(--accent-secondary);
+    background: var(--accent-secondary-dim);
+    padding: 1px 5px;
+    border-radius: 10px;
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+
+  /* Search */
   .search-box {
     display: flex;
     align-items: center;
-    gap: 7px;
-    margin: 8px 10px;
-    padding: 6px 10px;
+    gap: 6px;
+    margin: 6px 8px;
+    padding: 5px 8px;
     background: var(--bg-input);
     border: 1px solid var(--border-subtle);
     border-radius: var(--radius-md);
+    flex-shrink: 0;
   }
-
   .search-icon { color: var(--text-muted); flex-shrink: 0; }
-
   .search-input {
     flex: 1;
     background: transparent;
@@ -198,37 +325,97 @@
     color: var(--text-primary);
     font-size: 12px;
     padding: 0;
+    box-shadow: none;
   }
   .search-input::placeholder { color: var(--text-muted); }
-
-  .sidebar-tree {
-    flex: 1;
-    padding: 4px 0;
+  .clear-search {
+    background: transparent;
+    color: var(--text-muted);
+    font-size: 14px;
+    line-height: 1;
+    border-radius: 3px;
+    padding: 0 2px;
+    transition: var(--transition-fast);
   }
+  .clear-search:hover { color: var(--text-primary); }
 
-  .tree-section {
-    margin-bottom: 4px;
-  }
+  /* Tree */
+  .sidebar-tree { flex: 1; padding: 4px 0; }
 
-  .tree-section-header {
+  .col-header {
     display: flex;
     align-items: center;
     gap: 6px;
     width: 100%;
-    padding: 5px 12px;
+    padding: 5px 10px 5px 8px;
     background: transparent;
-    color: var(--text-muted);
-    font-size: 10px;
-    font-weight: 700;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
+    color: var(--text-secondary);
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    text-align: left;
     transition: var(--transition-fast);
   }
-  .tree-section-header:hover { color: var(--text-secondary); }
+  .col-header:hover { background: var(--bg-elevated); color: var(--text-primary); }
+  .col-header.eco { color: var(--text-muted); margin-top: 2px; }
+
+  .col-icon { color: var(--text-muted); flex-shrink: 0; }
+  .col-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+  .folder-header {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    width: 100%;
+    padding: 4px 8px 4px 20px;
+    background: transparent;
+    color: var(--text-muted);
+    font-size: 11px;
+    text-align: left;
+    transition: var(--transition-fast);
+  }
+  .folder-header:hover { background: var(--bg-elevated); color: var(--text-secondary); }
+  .folder-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+  .req-item {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    width: 100%;
+    padding: 4px 8px 4px 26px;
+    background: transparent;
+    color: var(--text-secondary);
+    font-size: 12px;
+    text-align: left;
+    transition: var(--transition-fast);
+    border-left: 2px solid transparent;
+  }
+  .req-item.nested { padding-left: 36px; }
+  .req-item:hover { background: var(--bg-elevated); color: var(--text-primary); }
+  .req-item.active {
+    background: var(--accent-primary-dim);
+    color: var(--text-primary);
+    border-left-color: var(--accent-primary);
+  }
+  .req-name {
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  /* Method badge override for sidebar (smaller) */
+  .req-item .method-badge {
+    font-size: 9px;
+    padding: 1px 4px;
+    min-width: 44px;
+    flex-shrink: 0;
+  }
 
   .chevron {
-    transition: transform var(--transition-fast);
     flex-shrink: 0;
+    transition: transform var(--transition-fast);
+    color: var(--text-muted);
   }
   .chevron.open { transform: rotate(90deg); }
 
@@ -239,78 +426,70 @@
     font-size: 9px;
     padding: 1px 5px;
     border-radius: 10px;
-  }
-
-  .tree-item {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    width: 100%;
-    padding: 5px 14px 5px 24px;
-    background: transparent;
-    color: var(--text-secondary);
-    font-size: 12px;
-    text-align: left;
-    transition: var(--transition-fast);
-    border-radius: 0;
-    overflow: hidden;
-    white-space: nowrap;
-    text-overflow: ellipsis;
-  }
-  .tree-item:hover { background: var(--bg-elevated); color: var(--text-primary); }
-
-  .ecosystem-item { padding-left: 16px; }
-
-  .eco-badge {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 18px;
-    height: 16px;
-    border-radius: 3px;
-    font-size: 9px;
-    font-weight: 700;
     flex-shrink: 0;
   }
-  .frappe { background: rgba(124, 110, 255, 0.2); color: var(--accent-primary); }
-  .django { background: rgba(54, 217, 196, 0.2); color: var(--accent-secondary); }
-  .openapi { background: rgba(63, 185, 80, 0.2); color: var(--color-success); }
+  .section-sep {
+    height: 1px;
+    background: var(--border-subtle);
+    margin: 6px 10px;
+  }
 
-  .empty-tree {
+  /* Empty state */
+  .empty-state {
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 4px;
-    padding: 16px;
+    gap: 8px;
+    padding: 32px 16px;
     color: var(--text-muted);
     font-size: 11px;
+    text-align: center;
+    line-height: 1.5;
   }
-
   .link-btn {
     background: transparent;
     color: var(--accent-primary);
     font-size: 11px;
+    transition: var(--transition-fast);
   }
+  .link-btn:hover { color: #9185ff; }
 
+  /* Footer */
   .sidebar-footer {
     border-top: 1px solid var(--border-subtle);
-    padding: 6px;
-    display: flex;
-    gap: 2px;
+    padding: 5px 8px;
+    flex-shrink: 0;
   }
 
-  .footer-btn {
-    flex: 1;
+  .env-btn {
     display: flex;
     align-items: center;
-    justify-content: center;
-    gap: 5px;
-    padding: 6px;
+    gap: 6px;
+    width: 100%;
+    padding: 5px 8px;
     background: transparent;
     color: var(--text-muted);
     font-size: 11px;
     border-radius: var(--radius-sm);
     transition: var(--transition-fast);
+    text-align: left;
   }
-  .footer-btn:hover { background: var(--bg-elevated); color: var(--text-secondary); }
+  .env-btn:hover { background: var(--bg-elevated); color: var(--text-secondary); }
+  .env-btn.active { background: var(--accent-primary-dim); color: var(--accent-primary); }
+
+  .env-name {
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .env-count {
+    background: var(--accent-primary-dim);
+    color: var(--accent-primary);
+    font-size: 9px;
+    padding: 1px 5px;
+    border-radius: 10px;
+    flex-shrink: 0;
+  }
 </style>

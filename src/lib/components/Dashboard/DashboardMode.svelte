@@ -93,12 +93,12 @@
         <div class="loadtest-config">
           <div class="config-row">
             <div class="config-field">
-              <label>URL</label>
-              <input type="text" placeholder="https://api.example.com/endpoint" class="form-input" />
+              <label for="lt-url">URL</label>
+              <input id="lt-url" type="text" placeholder="https://api.example.com/endpoint" class="form-input" />
             </div>
             <div class="config-field small">
-              <label>Method</label>
-              <select class="form-select">
+              <label for="lt-method">Method</label>
+              <select id="lt-method" class="form-select">
                 <option>GET</option><option>POST</option><option>PUT</option>
               </select>
             </div>
@@ -106,16 +106,16 @@
 
           <div class="config-row">
             <div class="config-field small">
-              <label>Concurrent Users</label>
-              <input type="number" value="50" min="1" max="1000" class="form-input" />
+              <label for="lt-users">Concurrent Users</label>
+              <input id="lt-users" type="number" value="50" min="1" max="1000" class="form-input" />
             </div>
             <div class="config-field small">
-              <label>Total Requests</label>
-              <input type="number" value="500" class="form-input" />
+              <label for="lt-total">Total Requests</label>
+              <input id="lt-total" type="number" value="500" class="form-input" />
             </div>
             <div class="config-field small">
-              <label>Duration (sec, 0 = use count)</label>
-              <input type="number" value="0" class="form-input" />
+              <label for="lt-duration">Duration (sec, 0 = use count)</label>
+              <input id="lt-duration" type="number" value="0" class="form-input" />
             </div>
           </div>
 

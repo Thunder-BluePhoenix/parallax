@@ -69,3 +69,30 @@ pub fn delete_collection(workspace: String, name: String) -> Result<(), String> 
     let path = parallax_dir(&workspace).join("collections").join(format!("{}.yaml", name));
     fs::remove_file(&path).map_err(|e| e.to_string())
 }
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct HistoryEntryMeta {
+    pub id: String,
+    pub request_id: String,
+    pub method: String,
+    pub url: String,
+    pub timestamp: u64,
+    pub status: u16,
+    pub duration_ms: u128,
+    pub size_bytes: usize,
+}
+
+#[tauri::command]
+pub fn save_history_entry(
+    workspace: String,
+    request_id: String,
+    entry: HistoryEntryMeta,
+) -> Result<(), String> {
+    let dir = parallax_dir(&workspace)
+        .join("history")
+        .join(&request_id);
+    fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
+    let filename = format!("{}.json", entry.timestamp);
+    let json = serde_json::to_string_pretty(&entry).map_err(|e| e.to_string())?;
+    fs::write(dir.join(filename), json).map_err(|e| e.to_string())
+}

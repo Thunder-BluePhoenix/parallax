@@ -4,155 +4,247 @@ import { invoke } from "@tauri-apps/api/core";
 // ============================================================
 // App Mode
 // ============================================================
-export const appMode = $state<{ value: "builder" | "dashboard" }>({
-  value: "builder",
-});
+export const appMode = $state<{ value: "builder" | "dashboard" }>({ value: "builder" });
 
 // ============================================================
 // Current Workspace
 // ============================================================
 export const currentWorkspace = $state<{
-  path: string;
-  name: string;
-  gitBranch: string | null;
-  hasParallax: boolean;
-}>({
-  path: "",
-  name: "No Workspace",
-  gitBranch: null,
-  hasParallax: false,
-});
+  path: string; name: string; gitBranch: string | null; hasParallax: boolean;
+}>({ path: "", name: "No Workspace", gitBranch: null, hasParallax: false });
 
 // ============================================================
-// Active Request (for Builder Mode)
+// Collection types (mirrors Rust structs)
+// ============================================================
+export interface CollectionRequest {
+  id: string; name: string; method: string; url: string;
+  headers: Record<string, string>;
+  params?: Record<string, string>;
+  body?: { type: string; content: any; raw?: string } | null;
+  auth?: any | null;
+}
+export interface CollectionFolder { name: string; requests: CollectionRequest[]; }
+export interface Collection {
+  name: string; version: string; description?: string;
+  requests: CollectionRequest[]; folders: CollectionFolder[];
+}
+export const loadedCollections = $state<Collection[]>([]);
+
+// ============================================================
+// Request state
 // ============================================================
 export type HttpMethod = "GET" | "POST" | "PUT" | "PATCH" | "DELETE" | "HEAD" | "OPTIONS";
-
-export interface RequestState {
-  id: string;
-  name: string;
-  method: HttpMethod;
-  url: string;
-  headers: Record<string, string>;
-  params: Record<string, string>;
-  bodyType: "none" | "json" | "form" | "urlencoded" | "raw" | "graphql";
-  bodyContent: string;
-  auth: AuthState;
-}
-
 export interface AuthState {
   type: "none" | "bearer" | "basic" | "api_key" | "ecosystem_provider";
-  token: string;
-  username: string;
-  password: string;
-  apiKeyHeader: string;
-  apiKeyValue: string;
-  provider: string;
-  providerSession: any | null;
+  token: string; username: string; password: string;
+  apiKeyHeader: string; apiKeyValue: string; provider: string; providerSession: any | null;
+}
+export interface RequestState {
+  id: string; name: string; method: HttpMethod; url: string;
+  headers: Record<string, string>; params: Record<string, string>;
+  bodyType: "none" | "json" | "form" | "urlencoded" | "raw" | "graphql";
+  bodyContent: string; auth: AuthState;
+}
+
+export function defaultAuth(): AuthState {
+  return { type: "none", token: "", username: "", password: "",
+           apiKeyHeader: "X-API-Key", apiKeyValue: "", provider: "frappe", providerSession: null };
 }
 
 export const activeRequest = $state<RequestState>({
-  id: crypto.randomUUID(),
-  name: "New Request",
-  method: "GET",
-  url: "",
-  headers: {},
-  params: {},
-  bodyType: "none",
-  bodyContent: "",
-  auth: {
-    type: "none",
-    token: "",
-    username: "",
-    password: "",
-    apiKeyHeader: "X-API-Key",
-    apiKeyValue: "",
-    provider: "frappe",
-    providerSession: null,
-  },
+  id: crypto.randomUUID(), name: "New Request", method: "GET", url: "",
+  headers: {}, params: {}, bodyType: "none", bodyContent: "", auth: defaultAuth(),
 });
 
 // ============================================================
-// Response State
+// Response state
 // ============================================================
 export interface ResponseState {
-  status: number;
-  statusText: string;
-  headers: Record<string, string>;
-  body: {
-    raw: string;
-    json: any | null;
-    contentType: string;
-  };
-  timing: {
-    totalMs: number;
-  };
-  sizeBytes: number;
+  status: number; statusText: string; headers: Record<string, string>;
+  body: { raw: string; json: any | null; contentType: string };
+  timing: { totalMs: number }; sizeBytes: number;
 }
-
-export const responseState = $state<{
-  loading: boolean;
-  response: ResponseState | null;
-  error: string | null;
-}>({
-  loading: false,
-  response: null,
-  error: null,
+export const responseState = $state<{ loading: boolean; response: ResponseState | null; error: string | null }>({
+  loading: false, response: null, error: null,
 });
 
 // ============================================================
-// Active Environment
+// History
 // ============================================================
-export const activeEnvironment = $state<{
-  name: string;
-  variables: Record<string, string>;
-}>({
-  name: "dev",
-  variables: {},
+export interface HistoryEntry {
+  id: string; requestId: string; requestName: string;
+  method: string; url: string; timestamp: number;
+  status: number; durationMs: number; sizeBytes: number; response: ResponseState;
+}
+export const responseHistory = $state<HistoryEntry[]>([]);
+
+// ============================================================
+// Environment
+// ============================================================
+export const activeEnvironment = $state<{ name: string; variables: Record<string, string> }>({
+  name: "No Environment", variables: {},
 });
 
 // ============================================================
-// Tabs (open requests)
+// Tabs
 // ============================================================
-export interface RequestTab {
-  id: string;
-  name: string;
-  method: HttpMethod;
-  modified: boolean;
-}
-
+export interface RequestTab { id: string; name: string; method: HttpMethod; modified: boolean; }
 export const tabs = $state<{ list: RequestTab[]; activeId: string }>({
-  list: [
-    { id: "default", name: "New Request", method: "GET", modified: false },
-  ],
+  list: [{ id: "default", name: "New Request", method: "GET", modified: false }],
   activeId: "default",
 });
 
-// ============================================================
-// Ecosystem Auth Sessions
-// ============================================================
 export const authSessions = $state<Record<string, any>>({});
 
 // ============================================================
-// Actions
+// Load a collection request into the active tab
+// ============================================================
+export function loadRequestIntoTab(req: CollectionRequest) {
+  activeRequest.id          = req.id;
+  activeRequest.name        = req.name;
+  activeRequest.method      = req.method as HttpMethod;
+  activeRequest.url         = req.url;
+  activeRequest.headers     = { ...(req.headers ?? {}) };
+  activeRequest.params      = { ...(req.params ?? {}) };
+  activeRequest.auth        = defaultAuth();
+  if (req.body && req.body.type && req.body.type !== "none") {
+    activeRequest.bodyType    = req.body.type as any;
+    activeRequest.bodyContent = req.body.raw ?? (req.body.content ? JSON.stringify(req.body.content, null, 2) : "");
+  } else {
+    activeRequest.bodyType = "none";
+    activeRequest.bodyContent = "";
+  }
+  if (req.auth) {
+    const a = req.auth;
+    activeRequest.auth.type         = a.auth_type ?? "none";
+    activeRequest.auth.token        = a.token ?? "";
+    activeRequest.auth.username     = a.username ?? "";
+    activeRequest.auth.password     = a.password ?? "";
+    activeRequest.auth.apiKeyHeader = a.api_key_header ?? "X-API-Key";
+    activeRequest.auth.apiKeyValue  = a.api_key_value ?? "";
+    activeRequest.auth.provider     = a.provider ?? "frappe";
+  }
+  const existing = tabs.list.find((t) => t.id === req.id);
+  if (existing) {
+    tabs.activeId = req.id;
+  } else {
+    tabs.list.push({ id: req.id, name: req.name, method: req.method as HttpMethod, modified: false });
+    tabs.activeId = req.id;
+  }
+  responseState.response = null;
+  responseState.error    = null;
+}
+
+// ============================================================
+// Curl parser
+// ============================================================
+export function parseCurl(raw: string): Partial<RequestState> | null {
+  const s = raw.trim();
+  if (!s.toLowerCase().startsWith("curl")) return null;
+  const result: any = { method: "GET", headers: {}, params: {}, bodyType: "none", bodyContent: "" };
+  const line = s.replace(/\\\s*\n/g, " ");
+
+  const urlMatch = line.match(/curl\s+(?:[^\s]*\s+)*['"]?(https?:\/\/[^\s'"]+)['"]?/)
+                ?? line.match(/['"]?(https?:\/\/[^\s'"]+)['"]?/);
+  if (urlMatch) result.url = urlMatch[1];
+
+  const methodMatch = line.match(/-X\s+['"]?([A-Z]+)['"]?/);
+  if (methodMatch) result.method = methodMatch[1];
+
+  const headerRe = /-H\s+['"]([^'"]+)['"]/g;
+  let m: RegExpExecArray | null;
+  while ((m = headerRe.exec(line)) !== null) {
+    const ci = m[1].indexOf(":");
+    if (ci > 0) {
+      const k = m[1].slice(0, ci).trim();
+      const v = m[1].slice(ci + 1).trim();
+      result.headers[k] = v;
+      if (k.toLowerCase() === "authorization" && v.toLowerCase().startsWith("bearer ")) {
+        result.auth = { ...defaultAuth(), type: "bearer", token: v.slice(7) };
+      }
+    }
+  }
+
+  const bodyMatch = line.match(/(?:--data-raw|--data|-d)\s+['"]([^'"]*)['"]/s)
+                 ?? line.match(/(?:--data-raw|--data|-d)\s+\$?['"]([^'"]*)['"]/s);
+  if (bodyMatch) {
+    if (result.method === "GET") result.method = "POST";
+    const body = bodyMatch[1];
+    try { JSON.parse(body); result.bodyType = "json"; result.bodyContent = body; }
+    catch {
+      const ct = Object.entries(result.headers as Record<string,string>)
+        .find(([k]) => k.toLowerCase() === "content-type")?.[1] ?? "";
+      result.bodyType    = ct.includes("x-www-form-urlencoded") ? "urlencoded" : "raw";
+      result.bodyContent = body;
+    }
+  }
+  return result.url ? result : null;
+}
+
+// ============================================================
+// Send Request
 // ============================================================
 export async function sendRequest() {
   if (!activeRequest.url) return;
+  const raw = activeRequest.url.trim();
 
-  responseState.loading = true;
-  responseState.error = null;
+  // Detect pasted curl command
+  if (raw.toLowerCase().startsWith("curl ")) {
+    const parsed = parseCurl(raw);
+    if (parsed) {
+      if (parsed.method)      activeRequest.method      = parsed.method;
+      if (parsed.url)         activeRequest.url         = parsed.url;
+      if (parsed.headers)     activeRequest.headers     = parsed.headers;
+      if (parsed.params)      activeRequest.params      = parsed.params;
+      if (parsed.bodyType)    activeRequest.bodyType    = parsed.bodyType;
+      if (parsed.bodyContent !== undefined) activeRequest.bodyContent = parsed.bodyContent;
+      if (parsed.auth)        Object.assign(activeRequest.auth, parsed.auth);
+      const tab = tabs.list.find((t) => t.id === tabs.activeId);
+      if (tab && parsed.method) tab.method = parsed.method;
+      return; // show populated fields, don't fire the request yet
+    }
+  }
+
+  responseState.loading  = true;
+  responseState.error    = null;
   responseState.response = null;
+  const t0 = Date.now();
 
   try {
-    const req = buildRequestPayload();
-    const env = { ...activeEnvironment.variables };
-
-    const result: ResponseState = await invoke("send_request", {
-      request: req,
-      environment: env,
+    const result = await invoke<any>("send_request", {
+      request:     buildPayload(),
+      environment: { ...activeEnvironment.variables },
     });
 
-    responseState.response = result;
+    const response: ResponseState = {
+      status:     result.status,
+      statusText: result.status_text ?? "",
+      headers:    result.headers ?? {},
+      body: {
+        raw:         result.body?.raw ?? "",
+        json:        result.body?.json ?? null,
+        contentType: result.body?.content_type ?? "",
+      },
+      timing:    { totalMs: result.timing?.total_ms ?? (Date.now() - t0) },
+      sizeBytes: result.size_bytes ?? 0,
+    };
+
+    responseState.response = response;
+
+    responseHistory.unshift({
+      id:          crypto.randomUUID(),
+      requestId:   activeRequest.id,
+      requestName: activeRequest.name,
+      method:      activeRequest.method,
+      url:         activeRequest.url,
+      timestamp:   Date.now(),
+      status:      response.status,
+      durationMs:  response.timing.totalMs,
+      sizeBytes:   response.sizeBytes,
+      response,
+    });
+    if (responseHistory.length > 200) responseHistory.splice(200);
+
   } catch (err: any) {
     responseState.error = err?.toString() ?? "Unknown error";
   } finally {
@@ -160,45 +252,25 @@ export async function sendRequest() {
   }
 }
 
-function buildRequestPayload() {
+function buildPayload() {
   return {
-    id: activeRequest.id,
-    name: activeRequest.name,
-    method: activeRequest.method,
-    url: activeRequest.url,
-    headers: activeRequest.headers,
-    params: activeRequest.params,
-    body: buildBody(),
-    auth: buildAuth(),
-    timeout_ms: 30000,
-    follow_redirects: true,
+    id: activeRequest.id, name: activeRequest.name, method: activeRequest.method,
+    url: activeRequest.url, headers: activeRequest.headers, params: activeRequest.params,
+    body: buildBody(), auth: buildAuth(), timeout_ms: 30000, follow_redirects: true,
   };
 }
-
 function buildBody() {
   if (activeRequest.bodyType === "none") return null;
-  return {
-    type: activeRequest.bodyType,
-    content: tryParse(activeRequest.bodyContent),
-    raw: activeRequest.bodyContent,
-  };
+  return { type: activeRequest.bodyType, content: tryParse(activeRequest.bodyContent), raw: activeRequest.bodyContent };
 }
-
 function buildAuth() {
   const a = activeRequest.auth;
   if (a.type === "none") return null;
   return {
-    auth_type: a.type,
-    token: a.token || null,
-    username: a.username || null,
-    password: a.password || null,
-    api_key_header: a.apiKeyHeader || null,
-    api_key_value: a.apiKeyValue || null,
-    provider: a.provider || null,
+    auth_type: a.type, token: a.token || null, username: a.username || null,
+    password: a.password || null, api_key_header: a.apiKeyHeader || null,
+    api_key_value: a.apiKeyValue || null, provider: a.provider || null,
     provider_session: a.providerSession || null,
   };
 }
-
-function tryParse(s: string) {
-  try { return JSON.parse(s); } catch { return s; }
-}
+function tryParse(s: string) { try { return JSON.parse(s); } catch { return s; } }

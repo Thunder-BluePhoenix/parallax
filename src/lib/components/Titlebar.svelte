@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { appMode, currentWorkspace } from "../../stores/app.svelte";
+  import { appMode, currentWorkspace } from "../stores/app.svelte";
 
   function toggleMode() {
     appMode.value = appMode.value === "builder" ? "dashboard" : "builder";

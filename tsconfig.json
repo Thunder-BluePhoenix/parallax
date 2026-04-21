@@ -7,5 +7,6 @@
     "moduleResolution": "bundler",
     "module": "ESNext",
     "skipLibCheck": true
-  }
+  },
+  "include": ["src/**/*", "src/**/*.svelte"]
 }

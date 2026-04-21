@@ -69,8 +69,19 @@ pub fn run() {
                 Ok(sidecar_command) => {
                     let args: Vec<&str> = vec!["--grpc-port", "50151"];
                     match sidecar_command.args(args).spawn() {
-                        Ok((_rx, _child)) => {
+                        Ok((mut rx, _child)) => {
                             println!("[Parallax] Go sidecar started on grpc :50151");
+                            
+                            // Pipe sidecar output to terminal
+                            tauri::async_runtime::spawn(async move {
+                                while let Some(event) = rx.recv().await {
+                                    if let tauri_plugin_shell::process::CommandEvent::Stdout(line) = event {
+                                        println!("[parallax-worker] {}", String::from_utf8_lossy(&line).trim());
+                                    } else if let tauri_plugin_shell::process::CommandEvent::Stderr(line) = event {
+                                        eprintln!("[parallax-worker-err] {}", String::from_utf8_lossy(&line).trim());
+                                    }
+                                }
+                            });
                         }
                         Err(e) => {
                             eprintln!("[Parallax] Go sidecar failed to start: {e} (run: make build-worker)");

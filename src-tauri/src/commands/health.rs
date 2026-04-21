@@ -22,7 +22,6 @@ pub struct HealthEvent {
 pub async fn start_health_stream(app: AppHandle) -> Result<(), String> {
     tauri::async_runtime::spawn(async move {
         let channel = match Channel::from_static("http://127.0.0.1:50151")
-            .timeout(Duration::from_secs(5))
             .connect()
             .await {
                 Ok(c) => c,

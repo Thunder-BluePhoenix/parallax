@@ -1,9 +1,15 @@
 <script lang="ts">
   import { invoke as tauriInvoke } from "@tauri-apps/api/core";
   import { onMount } from "svelte";
+  import { open } from "@tauri-apps/plugin-dialog";
   import Logo from "../Common/Logo.svelte";
   import HealthHeatmapPanel from "./HealthHeatmapPanel.svelte";
   import LiveTrafficPanel from "./LiveTrafficPanel.svelte";
+
+  // Schema Explorer state
+  let explorerPath = $state("");
+  let explorationResult = $state<any>(null);
+  let isExploring = $state(false);
 
   const invoke = <T>(cmd: string, args?: Record<string, any>): Promise<T> => {
     const fn = tauriInvoke || (window as any)?.__TAURI__?.core?.invoke;
@@ -27,6 +33,35 @@
     } catch (e) {
       console.error("[Dashboard] Worker status check failed:", e);
       workerConnected = false;
+    }
+  }
+  async function selectFolder() {
+    try {
+      const selected = await open({
+        directory: true,
+        multiple: false,
+        title: "Select Project Root"
+      });
+      if (selected) {
+        explorerPath = selected as string;
+        runExploration();
+      }
+    } catch (e) {
+      console.error("[Dashboard] Folder selection failed:", e);
+    }
+  }
+
+  async function runExploration() {
+    if (!explorerPath) return;
+    isExploring = true;
+    try {
+      explorationResult = await invoke("explore_schema", { rootPath: explorerPath });
+      console.log("[Dashboard] Exploration result:", explorationResult);
+    } catch (e) {
+      console.error("[Dashboard] Exploration failed:", e);
+      alert("Failed to explore project: " + e);
+    } finally {
+      isExploring = false;
     }
   }
 
@@ -174,9 +209,33 @@
             Point to a local project folder — Parallax will auto-detect the framework and map all entities + endpoints.
           </p>
           <div class="explorer-input">
-            <input type="text" placeholder="e.g. /Users/you/my-frappe-app" class="form-input flex-1" />
-            <button class="btn-action">Explore →</button>
+            <input 
+              type="text" 
+              bind:value={explorerPath}
+              placeholder="e.g. /Users/you/my-frappe-app" 
+              class="form-input flex-1" 
+            />
+            <button class="btn-action" onclick={selectFolder} disabled={isExploring}>
+              {isExploring ? "Scanning..." : "Explore →"}
+            </button>
           </div>
+
+          {#if explorationResult}
+            <div class="exploration-results">
+              <div class="result-header">
+                <span class="framework-badge">{explorationResult.framework.toUpperCase()} Detected</span>
+                <span class="entity-count">{explorationResult.entities.length} Entities Found</span>
+              </div>
+              <div class="entity-scroll">
+                {#each explorationResult.entities as entity}
+                  <div class="entity-item">
+                    <div class="entity-name">{entity.name}</div>
+                    <div class="entity-meta">{entity.fields.length} fields • {entity.endpoints.length} endpoints</div>
+                  </div>
+                {/each}
+              </div>
+            </div>
+          {/if}
         </div>
       </div>
     {/if}
@@ -407,4 +466,55 @@
   }
   .schema-explorer h3 { font-size: 14px; font-weight: 700; margin-bottom: 6px; }
 
+  .exploration-results {
+    margin-top: 16px;
+    padding-top: 16px;
+    border-top: 1px solid var(--border-default);
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+  .result-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .framework-badge {
+    background: var(--accent-primary-dim);
+    color: var(--accent-primary);
+    padding: 2px 8px;
+    border-radius: 10px;
+    font-size: 10px;
+    font-weight: 700;
+  }
+  .entity-count {
+    font-size: 11px;
+    color: var(--text-muted);
+  }
+  .entity-scroll {
+    max-height: 200px;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding-right: 4px;
+  }
+  .entity-item {
+    padding: 8px 10px;
+    background: var(--bg-elevated);
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-md);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .entity-name {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-primary);
+  }
+  .entity-meta {
+    font-size: 10px;
+    color: var(--text-muted);
+  }
 </style>

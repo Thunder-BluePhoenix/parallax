@@ -18,7 +18,11 @@ pub async fn ping_worker() -> Result<bool, String> {
         .timeout(Duration::from_secs(2))
         .connect()
         .await
-        .map_err(|e| format!("Failed to connect to worker: {}", e))?;
+        .map_err(|e| {
+            let err = format!("Failed to connect to worker: {}", e);
+            println!("[Rust] {}", err);
+            err
+        })?;
 
     let mut client = WorkerServiceClient::new(channel);
 
@@ -27,7 +31,13 @@ pub async fn ping_worker() -> Result<bool, String> {
     let response = client
         .ping(request)
         .await
-        .map_err(|e| format!("Ping failed: {}", e))?;
+        .map_err(|e| {
+            let err = format!("Ping failed: {}", e);
+            println!("[Rust] {}", err);
+            err
+        })?;
+    
+    println!("[Rust] ping_worker successful");
 
     Ok(response.into_inner().success)
 }

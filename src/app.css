@@ -1,0 +1,280 @@
+/* ============================================================
+   PARALLAX — Global Design System
+   Dark, premium, celestial aesthetic
+   ============================================================ */
+
+:root {
+  /* Color Palette */
+  --bg-void: #090b10;
+  --bg-base: #0d1117;
+  --bg-surface: #161b22;
+  --bg-elevated: #1c232e;
+  --bg-overlay: #21293a;
+  --bg-input: #131820;
+
+  /* Parallax Accent — Electric Indigo + Aurora */
+  --accent-primary: #7c6eff;
+  --accent-primary-dim: rgba(124, 110, 255, 0.15);
+  --accent-glow: rgba(124, 110, 255, 0.4);
+  --accent-secondary: #36d9c4;
+  --accent-secondary-dim: rgba(54, 217, 196, 0.12);
+
+  /* Status colors */
+  --color-success: #3fb950;
+  --color-success-dim: rgba(63, 185, 80, 0.12);
+  --color-warning: #e3b341;
+  --color-warning-dim: rgba(227, 179, 65, 0.12);
+  --color-error: #f85149;
+  --color-error-dim: rgba(248, 81, 73, 0.12);
+  --color-info: #58a6ff;
+  --color-info-dim: rgba(88, 166, 255, 0.12);
+
+  /* HTTP Method Colors */
+  --method-get: #3fb950;
+  --method-post: #7c6eff;
+  --method-put: #e3b341;
+  --method-patch: #36d9c4;
+  --method-delete: #f85149;
+  --method-head: #58a6ff;
+  --method-options: #bc8cff;
+
+  /* Typography */
+  --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
+  --font-mono: 'JetBrains Mono', 'Fira Code', monospace;
+
+  /* Text */
+  --text-primary: #e6edf3;
+  --text-secondary: #8b949e;
+  --text-muted: #484f58;
+  --text-link: var(--accent-primary);
+
+  /* Borders */
+  --border-subtle: rgba(48, 54, 61, 0.8);
+  --border-default: rgba(48, 54, 61, 1);
+  --border-accent: rgba(124, 110, 255, 0.4);
+
+  /* Spacing */
+  --sidebar-width: 260px;
+  --header-height: 42px;
+
+  /* Shadows */
+  --shadow-sm: 0 1px 3px rgba(0,0,0,0.4);
+  --shadow-md: 0 4px 16px rgba(0,0,0,0.5);
+  --shadow-lg: 0 8px 32px rgba(0,0,0,0.6);
+  --shadow-accent: 0 0 20px var(--accent-glow);
+
+  /* Radius */
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 10px;
+
+  /* Transitions */
+  --transition-fast: 120ms ease;
+  --transition-base: 200ms ease;
+}
+
+/* Reset */
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html, body, #app {
+  height: 100%;
+  overflow: hidden;
+}
+
+body {
+  font-family: var(--font-sans);
+  font-size: 13px;
+  background: var(--bg-void);
+  color: var(--text-primary);
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  user-select: none;
+}
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--bg-overlay); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: var(--text-muted); }
+
+/* Utility */
+.mono { font-family: var(--font-mono); }
+.text-secondary { color: var(--text-secondary); }
+.text-muted { color: var(--text-muted); }
+
+/* Method badges */
+.method-badge {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  padding: 2px 6px;
+  border-radius: var(--radius-sm);
+  text-transform: uppercase;
+  min-width: 52px;
+  text-align: center;
+}
+.method-GET { color: var(--method-get); background: rgba(63, 185, 80, 0.1); }
+.method-POST { color: var(--method-post); background: rgba(124, 110, 255, 0.1); }
+.method-PUT { color: var(--method-put); background: rgba(227, 179, 65, 0.1); }
+.method-PATCH { color: var(--method-patch); background: rgba(54, 217, 196, 0.1); }
+.method-DELETE { color: var(--method-delete); background: rgba(248, 81, 73, 0.1); }
+.method-HEAD { color: var(--method-head); background: rgba(88, 166, 255, 0.1); }
+
+/* Status code colors */
+.status-2xx { color: var(--color-success); }
+.status-3xx { color: var(--color-info); }
+.status-4xx { color: var(--color-warning); }
+.status-5xx { color: var(--color-error); }
+
+/* Button base */
+button {
+  font-family: var(--font-sans);
+  cursor: pointer;
+  border: none;
+  outline: none;
+  transition: var(--transition-fast);
+}
+
+button:focus-visible {
+  outline: 2px solid var(--accent-primary);
+  outline-offset: 2px;
+}
+
+/* Input base */
+input, textarea, select {
+  font-family: var(--font-sans);
+  font-size: 13px;
+  color: var(--text-primary);
+  background: var(--bg-input);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  outline: none;
+  transition: border-color var(--transition-fast);
+}
+
+input:focus, textarea:focus, select:focus {
+  border-color: var(--accent-primary);
+  box-shadow: 0 0 0 2px var(--accent-primary-dim);
+}
+
+/* Divider */
+.divider {
+  width: 1px;
+  background: var(--border-default);
+  height: 100%;
+}
+
+/* Pane */
+.pane {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  height: 100%;
+}
+
+/* Tab bar */
+.tab-bar {
+  display: flex;
+  border-bottom: 1px solid var(--border-default);
+  background: var(--bg-surface);
+  flex-shrink: 0;
+}
+
+.tab {
+  padding: 8px 16px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-secondary);
+  background: transparent;
+  border-bottom: 2px solid transparent;
+  cursor: pointer;
+  transition: var(--transition-fast);
+  white-space: nowrap;
+}
+
+.tab:hover { color: var(--text-primary); }
+.tab.active {
+  color: var(--accent-primary);
+  border-bottom-color: var(--accent-primary);
+}
+
+/* Send button */
+.btn-send {
+  padding: 0 20px;
+  height: 34px;
+  background: var(--accent-primary);
+  color: white;
+  font-size: 13px;
+  font-weight: 600;
+  border-radius: var(--radius-md);
+  transition: var(--transition-fast);
+  white-space: nowrap;
+}
+
+.btn-send:hover {
+  background: #9185ff;
+  box-shadow: var(--shadow-accent);
+}
+
+.btn-send:active { transform: scale(0.98); }
+
+.btn-send.loading {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+/* Icon button */
+.icon-btn {
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border-radius: var(--radius-sm);
+  color: var(--text-secondary);
+  transition: var(--transition-fast);
+}
+
+.icon-btn:hover {
+  background: var(--bg-overlay);
+  color: var(--text-primary);
+}
+
+/* Scrollable */
+.scroll-y {
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+/* Animations */
+@keyframes pulse-dot {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.3; }
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.animate-fade-in { animation: fadeIn 200ms ease both; }
+
+.spinner {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  border: 2px solid rgba(255,255,255,0.2);
+  border-top-color: white;
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+}

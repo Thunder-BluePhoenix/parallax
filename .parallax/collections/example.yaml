@@ -1,0 +1,44 @@
+name: Example API
+version: "1.0"
+description: Parallax example collection
+
+requests:
+  - id: healthcheck
+    name: Health Check
+    method: GET
+    url: "{{base_url}}/health"
+    headers:
+      Accept: application/json
+    body: null
+    auth: null
+    timeout_ms: 5000
+
+  - id: get-user
+    name: Get User
+    method: GET
+    url: "{{base_url}}/api/user/{{user_id}}"
+    headers:
+      Authorization: "Bearer {{token}}"
+      Accept: application/json
+    body: null
+    auth:
+      auth_type: bearer
+      token: "{{token}}"
+    timeout_ms: 10000
+
+  - id: create-resource
+    name: Create Resource
+    method: POST
+    url: "{{base_url}}/api/resource"
+    headers:
+      Content-Type: application/json
+      Authorization: "Bearer {{token}}"
+    body:
+      type: json
+      content:
+        name: "{{resource_name}}"
+        type: "example"
+      raw: null
+    auth:
+      auth_type: bearer
+      token: "{{token}}"

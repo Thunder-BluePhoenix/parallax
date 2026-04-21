@@ -1,0 +1,9 @@
+{
+  "name": "dev",
+  "variables": {
+    "base_url": "http://localhost:8000",
+    "token": "",
+    "user_id": "1",
+    "resource_name": "Test Resource"
+  }
+}

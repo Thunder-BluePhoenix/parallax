@@ -1,0 +1,144 @@
+syntax = "proto3";
+
+package parallax;
+
+option go_package = "github.com/bluephoenix/parallax-worker/proto";
+
+// =============================================================================
+// Load Test Service
+// =============================================================================
+service LoadTestService {
+  rpc RunLoadTest(LoadTestConfig) returns (stream LoadTestProgress);
+  rpc StopLoadTest(StopRequest) returns (GenericResponse);
+  rpc GetLastResult(GenericRequest) returns (LoadTestResult);
+}
+
+message LoadTestConfig {
+  string url = 1;
+  string method = 2;
+  map<string, string> headers = 3;
+  string body = 4;
+  int32 concurrent = 5;
+  int32 total_requests = 6;
+  int32 duration_sec = 7;
+}
+
+message LoadTestProgress {
+  int64 completed = 1;
+  int64 total = 2;
+  double current_rps = 3;
+  bool done = 4;
+  LoadTestResult result = 5;
+}
+
+message LoadTestResult {
+  int64 total_requests = 1;
+  int64 successful = 2;
+  int64 failed = 3;
+  double avg_latency_ms = 4;
+  double p50_latency_ms = 5;
+  double p95_latency_ms = 6;
+  double p99_latency_ms = 7;
+  double min_latency_ms = 8;
+  double max_latency_ms = 9;
+  double reqs_per_sec = 10;
+  repeated string errors = 11;
+  repeated int64 histogram = 12;
+}
+
+// =============================================================================
+// Health Monitor Service
+// =============================================================================
+service HealthService {
+  rpc AddTarget(ServiceTarget) returns (GenericResponse);
+  rpc RemoveTarget(TargetIDRequest) returns (GenericResponse);
+  rpc GetStatuses(GenericRequest) returns (HealthStatusList);
+  rpc WatchStatuses(GenericRequest) returns (stream ServiceStatus);
+}
+
+message ServiceTarget {
+  string id = 1;
+  string name = 2;
+  string url = 3;
+  int32 interval_sec = 4;
+  int32 timeout_ms = 5;
+}
+
+message ServiceStatus {
+  string id = 1;
+  string name = 2;
+  string url = 3;
+  string status = 4;
+  double latency_ms = 5;
+  int32 status_code = 6;
+  int64 last_checked = 7;
+  string error_msg = 8;
+}
+
+message HealthStatusList {
+  repeated ServiceStatus statuses = 1;
+}
+
+// =============================================================================
+// Watcher Service
+// =============================================================================
+service WatcherService {
+  rpc WatchWorkspace(WatchRequest) returns (stream FileChangeEvent);
+  rpc UnwatchWorkspace(WatchRequest) returns (GenericResponse);
+}
+
+message WatchRequest {
+  string workspace_path = 1;
+}
+
+message FileChangeEvent {
+  string path = 1;
+  string operation = 2;
+  bool is_collection = 3;
+  bool is_environment = 4;
+}
+
+// =============================================================================
+// Proxy Service
+// =============================================================================
+service ProxyService {
+  rpc GetTraffic(TrafficRequest) returns (TrafficList);
+  rpc WatchTraffic(GenericRequest) returns (stream TrafficEntry);
+  rpc ClearTraffic(GenericRequest) returns (GenericResponse);
+}
+
+message TrafficRequest {
+  int32 limit = 1;
+}
+
+message TrafficEntry {
+  string id = 1;
+  int64 timestamp_ms = 2;
+  string method = 3;
+  string url = 4;
+  map<string, string> request_headers = 5;
+  map<string, string> response_headers = 6;
+  int32 status_code = 7;
+  double latency_ms = 8;
+  int32 request_body_bytes = 9;
+  int32 response_body_bytes = 10;
+  string content_type = 11;
+  string preview = 12;
+}
+
+message TrafficList {
+  repeated TrafficEntry entries = 1;
+}
+
+// =============================================================================
+// Common
+// =============================================================================
+message GenericRequest {}
+message StopRequest {}
+message GenericResponse {
+  bool success = 1;
+  string message = 2;
+}
+message TargetIDRequest {
+  string id = 1;
+}

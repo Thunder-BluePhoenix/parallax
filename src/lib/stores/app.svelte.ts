@@ -1,5 +1,6 @@
 // Parallax Global App State — Svelte 5 Runes
 import { invoke } from "@tauri-apps/api/core";
+import { resolveRequestTemplates } from "../utils/template-tags";
 
 // ============================================================
 // App Mode
@@ -95,6 +96,20 @@ export const tabs = $state<{ list: RequestTab[]; activeId: string }>({
 });
 
 export const authSessions = $state<Record<string, any>>({});
+
+// ============================================================
+// Scripts
+// ============================================================
+export interface ScriptState {
+  preRequest: string;
+  tests: string;
+}
+export const activeScripts = $state<ScriptState>({ preRequest: "", tests: "" });
+
+export interface TestResult {
+  name: string; passed: boolean; error?: string;
+}
+export const testResults = $state<{ results: TestResult[]; ran: boolean }>({ results: [], ran: false });
 
 // ============================================================
 // Load a collection request into the active tab
@@ -208,11 +223,21 @@ export async function sendRequest() {
   responseState.loading  = true;
   responseState.error    = null;
   responseState.response = null;
+  testResults.results    = [];
+  testResults.ran        = false;
   const t0 = Date.now();
 
   try {
+    // Run pre-request script
+    if (activeScripts.preRequest.trim()) {
+      const { runPreRequestScript } = await import("../utils/pm-script-runner");
+      await runPreRequestScript(activeScripts.preRequest, activeEnvironment.variables);
+    }
+
+    const payload = resolveRequestTemplates(buildPayload(), activeEnvironment.variables);
+
     const result = await invoke<any>("send_request", {
-      request:     buildPayload(),
+      request:     payload,
       environment: { ...activeEnvironment.variables },
     });
 
@@ -230,6 +255,14 @@ export async function sendRequest() {
     };
 
     responseState.response = response;
+
+    // Run test script
+    if (activeScripts.tests.trim()) {
+      const { runTestScript } = await import("../utils/pm-script-runner");
+      const results = await runTestScript(activeScripts.tests, response, activeEnvironment.variables);
+      testResults.results = results;
+      testResults.ran     = true;
+    }
 
     responseHistory.unshift({
       id:          crypto.randomUUID(),

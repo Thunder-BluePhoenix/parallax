@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { activeRequest } from "../../stores/app.svelte";
+  import { activeRequest, activeScripts } from "../../stores/app.svelte";
 
   let { activeTab = $bindable() } = $props<{ activeTab: string }>();
 
@@ -13,6 +13,8 @@
     const { [key]: _, ...rest } = activeRequest.headers;
     activeRequest.headers = rest;
   }
+
+  let scriptTab = $state<"pre" | "tests">("pre");
 
   const BODY_TYPES = [
     { value: "none", label: "None" },
@@ -117,8 +119,8 @@
     {:else if activeTab === "auth"}
       <div class="auth-section">
         <div class="auth-type-select">
-          <label class="field-label">Auth Type</label>
-          <select bind:value={activeRequest.auth.type}>
+          <label for="auth-type" class="field-label">Auth Type</label>
+          <select id="auth-type" bind:value={activeRequest.auth.type}>
             <option value="none">None</option>
             <option value="bearer">Bearer Token</option>
             <option value="basic">Basic Auth</option>
@@ -129,30 +131,30 @@
 
         {#if activeRequest.auth.type === "bearer"}
           <div class="auth-fields">
-            <label class="field-label">Token</label>
-            <input class="mono" type="text" placeholder="Bearer token..." bind:value={activeRequest.auth.token} />
+            <label for="auth-token" class="field-label">Token</label>
+            <input id="auth-token" class="mono" type="text" placeholder="Bearer token..." bind:value={activeRequest.auth.token} />
           </div>
 
         {:else if activeRequest.auth.type === "basic"}
           <div class="auth-fields">
-            <label class="field-label">Username</label>
-            <input type="text" placeholder="Username" bind:value={activeRequest.auth.username} />
-            <label class="field-label mt">Password</label>
-            <input type="password" placeholder="Password" bind:value={activeRequest.auth.password} />
+            <label for="auth-username" class="field-label">Username</label>
+            <input id="auth-username" type="text" placeholder="Username" bind:value={activeRequest.auth.username} />
+            <label for="auth-password" class="field-label mt">Password</label>
+            <input id="auth-password" type="password" placeholder="Password" bind:value={activeRequest.auth.password} />
           </div>
 
         {:else if activeRequest.auth.type === "api_key"}
           <div class="auth-fields">
-            <label class="field-label">Header Name</label>
-            <input type="text" placeholder="X-API-Key" bind:value={activeRequest.auth.apiKeyHeader} />
-            <label class="field-label mt">Value</label>
-            <input class="mono" type="text" placeholder="API key value" bind:value={activeRequest.auth.apiKeyValue} />
+            <label for="auth-key-header" class="field-label">Header Name</label>
+            <input id="auth-key-header" type="text" placeholder="X-API-Key" bind:value={activeRequest.auth.apiKeyHeader} />
+            <label for="auth-key-value" class="field-label mt">Value</label>
+            <input id="auth-key-value" class="mono" type="text" placeholder="API key value" bind:value={activeRequest.auth.apiKeyValue} />
           </div>
 
         {:else if activeRequest.auth.type === "ecosystem_provider"}
           <div class="auth-fields">
-            <label class="field-label">Framework</label>
-            <select bind:value={activeRequest.auth.provider}>
+            <label for="auth-provider" class="field-label">Framework</label>
+            <select id="auth-provider" bind:value={activeRequest.auth.provider}>
               <option value="frappe">Frappe / ERPNext</option>
               <option value="django">Django</option>
               <option value="laravel">Laravel</option>
@@ -182,7 +184,38 @@
 
     {:else if activeTab === "scripts"}
       <div class="scripts-section">
-        <p class="helper-text">Pre-request and test scripts coming in Phase 3.</p>
+        <div class="scripts-tabs">
+          <button
+            class="script-tab"
+            class:active={scriptTab === "pre"}
+            onclick={() => (scriptTab = "pre")}
+          >Pre-request</button>
+          <button
+            class="script-tab"
+            class:active={scriptTab === "tests"}
+            onclick={() => (scriptTab = "tests")}
+          >Tests</button>
+        </div>
+
+        {#if scriptTab === "pre"}
+          <div class="script-editor-wrap">
+            <div class="script-hint mono">// pm.environment.set("token", pm.response.json().token);</div>
+            <textarea
+              class="script-textarea mono"
+              placeholder={"// Pre-request script\n// Runs before the request is sent\n// pm.environment.set('key', 'value');"}
+              bind:value={activeScripts.preRequest}
+            ></textarea>
+          </div>
+        {:else}
+          <div class="script-editor-wrap">
+            <div class="script-hint mono">// pm.test("Status is 200", () =&gt; pm.expect(pm.response.code).to.equal(200));</div>
+            <textarea
+              class="script-textarea mono"
+              placeholder={"// Test script\n// Runs after the response is received\npm.test('Status is 200', () => {\n  pm.expect(pm.response.code).to.equal(200);\n});"}
+              bind:value={activeScripts.tests}
+            ></textarea>
+          </div>
+        {/if}
       </div>
     {/if}
   </div>
@@ -352,5 +385,51 @@
     font-weight: 500;
   }
 
-  .scripts-section { padding: 16px; }
+  .scripts-section { display: flex; flex-direction: column; height: 100%; }
+
+  .scripts-tabs {
+    display: flex;
+    gap: 2px;
+    padding: 6px 12px;
+    border-bottom: 1px solid var(--border-subtle);
+    flex-shrink: 0;
+  }
+
+  .script-tab {
+    padding: 3px 12px;
+    font-size: 11px;
+    color: var(--text-secondary);
+    background: transparent;
+    border-radius: var(--radius-sm);
+    transition: var(--transition-fast);
+  }
+  .script-tab:hover { background: var(--bg-elevated); color: var(--text-primary); }
+  .script-tab.active { background: var(--accent-primary-dim); color: var(--accent-primary); }
+
+  .script-editor-wrap { display: flex; flex-direction: column; flex: 1; }
+
+  .script-hint {
+    padding: 6px 12px;
+    font-size: 10px;
+    color: var(--text-muted);
+    background: var(--bg-surface);
+    border-bottom: 1px solid var(--border-subtle);
+    flex-shrink: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .script-textarea {
+    flex: 1;
+    resize: none;
+    border: none;
+    border-radius: 0;
+    padding: 10px 12px;
+    font-size: 12px;
+    line-height: 1.7;
+    background: var(--bg-base);
+    color: var(--text-primary);
+    height: 100%;
+  }
 </style>

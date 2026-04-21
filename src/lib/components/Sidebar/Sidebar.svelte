@@ -7,9 +7,11 @@
     type Collection, defaultAuth,
   } from "../../stores/app.svelte";
   import EnvironmentPanel from "./EnvironmentPanel.svelte";
+  import { importPostmanCollection, importInsomniaExport } from "../../utils/postman-importer";
 
   let searchQuery   = $state("");
   let showEnvPanel  = $state(false);
+  let importError   = $state("");
   let expandedCols  = $state<Record<string, boolean>>({});
   let expandedFolders = $state<Record<string, boolean>>({});
 
@@ -74,6 +76,31 @@
     activeRequest.auth        = defaultAuth();
   }
 
+  async function importCollection(e: Event) {
+    importError = "";
+    const file = (e.target as HTMLInputElement).files?.[0];
+    if (!file) return;
+    const text = await file.text();
+    try {
+      let col;
+      if (text.includes('"__export_format"') || text.includes('"_type":"workspace"')) {
+        col = importInsomniaExport(text);
+      } else {
+        col = importPostmanCollection(text);
+      }
+      if (currentWorkspace.path) {
+        await invoke("save_collection", { workspace: currentWorkspace.path, collection: col });
+        await loadCollections(currentWorkspace.path);
+      } else {
+        loadedCollections.push(col);
+        expandedCols[col.name] = true;
+      }
+    } catch (err: any) {
+      importError = err?.message ?? "Import failed";
+    }
+    (e.target as HTMLInputElement).value = "";
+  }
+
   function toggleCol(name: string) {
     expandedCols[name] = !expandedCols[name];
   }
@@ -113,7 +140,18 @@
         <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
       </svg>
     </button>
+    <label class="icon-btn" title="Import Postman / Insomnia collection">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+        <polyline points="7 10 12 15 17 10"/>
+        <line x1="12" y1="15" x2="12" y2="3"/>
+      </svg>
+      <input type="file" accept=".json" style="display:none" onchange={importCollection} />
+    </label>
   </div>
+  {#if importError}
+    <div class="import-error">{importError}</div>
+  {/if}
 
   <!-- Search -->
   <div class="search-box">
@@ -303,6 +341,14 @@
     border-radius: 10px;
     white-space: nowrap;
     flex-shrink: 0;
+  }
+
+  .import-error {
+    font-size: 10px;
+    color: var(--color-error);
+    padding: 3px 10px;
+    background: var(--color-error-dim);
+    border-bottom: 1px solid var(--border-subtle);
   }
 
   /* Search */

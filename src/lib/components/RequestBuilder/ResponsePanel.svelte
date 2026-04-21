@@ -1,7 +1,8 @@
 <script lang="ts">
-  import { responseState } from "../../stores/app.svelte";
+  import { responseState, responseHistory, testResults } from "../../stores/app.svelte";
 
-  let viewMode = $state<"pretty" | "raw" | "headers">("pretty");
+  let viewMode   = $state<"pretty" | "raw" | "headers" | "tests" | "history">("pretty");
+  let historyIdx = $state(0);
 
   function statusClass(code: number) {
     if (code >= 500) return "status-5xx";
@@ -59,15 +60,37 @@
       </div>
 
       <div class="view-modes">
-        {#each ["pretty", "raw", "headers"] as mode}
+        {#each (["pretty", "raw", "headers"] as const) as mode}
           <button
             class="view-mode-btn"
             class:active={viewMode === mode}
-            onclick={() => (viewMode = mode as any)}
+            onclick={() => (viewMode = mode)}
           >
             {mode.charAt(0).toUpperCase() + mode.slice(1)}
           </button>
         {/each}
+        <button
+          class="view-mode-btn"
+          class:active={viewMode === "tests"}
+          onclick={() => (viewMode = "tests")}
+        >
+          Tests
+          {#if testResults.ran}
+            {@const passed = testResults.results.filter(r => r.passed).length}
+            {@const total  = testResults.results.length}
+            <span class="test-badge" class:fail={passed < total}>{passed}/{total}</span>
+          {/if}
+        </button>
+        <button
+          class="view-mode-btn"
+          class:active={viewMode === "history"}
+          onclick={() => { viewMode = "history"; historyIdx = 0; }}
+        >
+          History
+          {#if responseHistory.length > 0}
+            <span class="test-badge">{responseHistory.length}</span>
+          {/if}
+        </button>
       </div>
     </div>
 
@@ -98,6 +121,53 @@
               <span class="header-val mono">{val}</span>
             </div>
           {/each}
+        </div>
+
+      {:else if viewMode === "tests"}
+        <div class="tests-viewer">
+          {#if !testResults.ran}
+            <p class="tests-empty">No tests ran — add scripts in the Tests tab and send the request.</p>
+          {:else if testResults.results.length === 0}
+            <p class="tests-empty">Script ran but contained no <code>pm.test()</code> calls.</p>
+          {:else}
+            {#each testResults.results as result}
+              <div class="test-row" class:test-pass={result.passed} class:test-fail={!result.passed}>
+                <span class="test-icon">{result.passed ? "✓" : "✗"}</span>
+                <span class="test-name">{result.name}</span>
+                {#if result.error}
+                  <span class="test-error">{result.error}</span>
+                {/if}
+              </div>
+            {/each}
+          {/if}
+        </div>
+
+      {:else if viewMode === "history"}
+        <div class="history-viewer">
+          {#if responseHistory.length === 0}
+            <p class="tests-empty">No history yet — send a request to record it here.</p>
+          {:else}
+            <div class="history-list">
+              {#each responseHistory as entry, i}
+                <button
+                  class="history-entry"
+                  class:active={historyIdx === i}
+                  onclick={() => (historyIdx = i)}
+                >
+                  <span class="history-method method-{entry.method.toLowerCase()}">{entry.method}</span>
+                  <span class="history-url">{entry.url}</span>
+                  <span class="history-status" class:status-2xx={entry.status < 300} class:status-4xx={entry.status >= 400}>{entry.status}</span>
+                  <span class="history-time">{entry.durationMs}ms</span>
+                </button>
+              {/each}
+            </div>
+            {#if responseHistory[historyIdx]}
+              {@const hres = responseHistory[historyIdx].response}
+              <div class="history-body scroll-y">
+                <pre class="raw-body mono">{hres.body.raw}</pre>
+              </div>
+            {/if}
+          {/if}
         </div>
       {/if}
     </div>
@@ -302,4 +372,107 @@
     font-family: var(--font-mono);
     color: var(--text-secondary);
   }
+
+  /* Test badge on view-mode button */
+  .test-badge {
+    display: inline-block;
+    margin-left: 4px;
+    padding: 0 5px;
+    border-radius: 10px;
+    font-size: 9px;
+    background: var(--color-success-dim, rgba(0,255,156,0.15));
+    color: var(--color-success);
+  }
+  .test-badge.fail {
+    background: var(--color-error-dim);
+    color: var(--color-error);
+  }
+
+  /* Tests panel */
+  .tests-viewer { padding: 8px 12px; display: flex; flex-direction: column; gap: 2px; }
+  .tests-empty  { font-size: 12px; color: var(--text-muted); padding: 16px 0; }
+  .tests-empty code { font-family: var(--font-mono); color: var(--accent-primary); }
+
+  .test-row {
+    display: grid;
+    grid-template-columns: 16px 1fr;
+    gap: 8px;
+    align-items: start;
+    padding: 6px 8px;
+    border-radius: var(--radius-sm);
+    font-size: 12px;
+  }
+  .test-pass { background: rgba(0,255,156,0.06); }
+  .test-fail { background: rgba(255,80,80,0.08); }
+
+  .test-icon { font-size: 11px; font-weight: 700; line-height: 1.6; }
+  .test-pass .test-icon { color: var(--color-success); }
+  .test-fail .test-icon { color: var(--color-error); }
+
+  .test-name { color: var(--text-primary); line-height: 1.6; }
+  .test-error {
+    grid-column: 2;
+    font-size: 11px;
+    font-family: var(--font-mono);
+    color: var(--color-error);
+    opacity: 0.8;
+    word-break: break-all;
+  }
+
+  /* History panel */
+  .history-viewer { display: flex; flex-direction: column; height: 100%; }
+
+  .history-list {
+    flex-shrink: 0;
+    max-height: 180px;
+    overflow-y: auto;
+    border-bottom: 1px solid var(--border-subtle);
+  }
+
+  .history-entry {
+    display: grid;
+    grid-template-columns: 52px 1fr 46px 52px;
+    gap: 8px;
+    align-items: center;
+    padding: 5px 12px;
+    font-size: 11px;
+    background: transparent;
+    color: var(--text-secondary);
+    text-align: left;
+    width: 100%;
+    border-radius: 0;
+    transition: var(--transition-fast);
+  }
+  .history-entry:hover { background: var(--bg-elevated); }
+  .history-entry.active { background: var(--accent-primary-dim); }
+
+  .history-method {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    font-weight: 700;
+    text-align: center;
+    border-radius: 3px;
+    padding: 1px 4px;
+  }
+  .method-get    { color: #4ade80; }
+  .method-post   { color: #fb923c; }
+  .method-put    { color: #60a5fa; }
+  .method-patch  { color: #a78bfa; }
+  .method-delete { color: #f87171; }
+
+  .history-url {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-family: var(--font-mono);
+    font-size: 10px;
+  }
+
+  .history-status { font-family: var(--font-mono); font-weight: 600; font-size: 11px; }
+  .history-status.status-2xx { color: var(--color-success); }
+  .history-status.status-4xx { color: var(--color-error); }
+
+  .history-time { font-family: var(--font-mono); font-size: 10px; color: var(--text-muted); text-align: right; }
+
+  .history-body { flex: 1; }
 </style>

@@ -1,2 +1,110 @@
-/.claude
-/docs
+# ─── Claude & AI Tools ───────────────────────────────────────────────────────
+.claude/
+
+# ─── Rust / Cargo ────────────────────────────────────────────────────────────
+target/
+Cargo.lock
+**/*.rs.bk
+*.pdb
+
+# ─── Go ──────────────────────────────────────────────────────────────────────
+src-go/bin/
+src-go/vendor/
+*.exe
+*.test
+*.out
+
+# ─── Node / npm ──────────────────────────────────────────────────────────────
+node_modules/
+dist/
+.svelte-kit/
+build/
+.vite/
+*.local
+
+# ─── Tauri ───────────────────────────────────────────────────────────────────
+src-tauri/target/
+src-tauri/WixTools/
+src-tauri/gen/
+/gen/
+
+# Tauri build outputs
+*.dmg
+*.app
+*.msi
+*.deb
+*.rpm
+*.AppImage
+*.nsis
+
+# ─── Parallax Runtime Data ───────────────────────────────────────────────────
+# Sensitive environments — never commit prod secrets
+.parallax/environments/prod.json
+.parallax/environments/staging.json
+.parallax/environments/*.secret.json
+
+# Cookie jar — session data
+.parallax/cookies/
+
+# Request history — can be large and is machine-specific
+.parallax/history/
+
+# Health database
+.parallax/health.db
+.parallax/health.db-shm
+.parallax/health.db-wal
+
+# Load test and run reports — generated output
+.parallax/reports/
+
+# AI config — contains API keys
+.parallax/ai.json
+
+# Generated docs output
+.parallax/docs/
+
+# ─── OS ──────────────────────────────────────────────────────────────────────
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+desktop.ini
+
+# ─── Editors ─────────────────────────────────────────────────────────────────
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.project
+.classpath
+.settings/
+
+# ─── Env / Secrets ───────────────────────────────────────────────────────────
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.cert
+*.p12
+
+# ─── Logs ────────────────────────────────────────────────────────────────────
+*.log
+logs/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# ─── gRPC Generated Code ─────────────────────────────────────────────────────
+# Regenerated from .proto files — don't commit generated stubs
+src-go/grpc/*.pb.go
+src-tauri/gen/
+
+# ─── Parallax Sidecar Binaries ───────────────────────────────────────────────
+# Compiled Go binaries — built during CI or locally via build script
+src-tauri/binaries/parallax-worker*
+src-tauri/binaries/parallax-cli*

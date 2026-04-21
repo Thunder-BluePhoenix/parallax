@@ -49,6 +49,22 @@ pub async fn open_workspace(path: String) -> Result<WorkspaceInfo, String> {
 }
 
 #[tauri::command]
+pub async fn create_workspace(path: String) -> Result<(), String> {
+    let root = PathBuf::from(&path);
+    let parallax_dir = root.join(".parallax");
+    std::fs::create_dir_all(parallax_dir.join("collections")).map_err(|e| e.to_string())?;
+    std::fs::create_dir_all(parallax_dir.join("environments")).map_err(|e| e.to_string())?;
+    std::fs::create_dir_all(parallax_dir.join("history")).map_err(|e| e.to_string())?;
+    std::fs::create_dir_all(parallax_dir.join("scripts")).map_err(|e| e.to_string())?;
+
+    let globals = r#"{"name":"globals","variables":{}}"#;
+    std::fs::write(parallax_dir.join("environments").join("globals.json"), globals)
+        .map_err(|e| e.to_string())?;
+
+    Ok(())
+}
+
+#[tauri::command]
 pub async fn get_workspace_info(path: String) -> Result<WorkspaceInfo, String> {
     open_workspace(path).await
 }

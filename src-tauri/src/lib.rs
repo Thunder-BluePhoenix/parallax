@@ -40,6 +40,7 @@ pub fn run() {
             commands::schema::list_frameworks,
             // Workspace
             commands::workspace::open_workspace,
+            commands::workspace::create_workspace,
             commands::workspace::get_workspace_info,
             commands::workspace::get_current_branch,
             // Worker

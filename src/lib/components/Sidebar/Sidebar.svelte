@@ -34,6 +34,11 @@
     })).filter((c) => c.requests.length > 0 || c.folders.length > 0);
   });
 
+  // ── Context menu state ─────────────────────────────────────
+  let contextMenu = $state<{ x: number; y: number; colName: string } | null>(null);
+
+  function closeContextMenu() { contextMenu = null; }
+
   // ── Open workspace folder ──────────────────────────────────
   async function openWorkspace() {
     const selected = await open({ directory: true, multiple: false, title: "Open Workspace" });
@@ -48,6 +53,22 @@
     await loadCollections(selected);
   }
 
+  // ── Create new workspace ───────────────────────────────────
+  async function createWorkspace() {
+    const selected = await open({ directory: true, multiple: false, title: "Choose folder for new workspace" });
+    if (!selected || typeof selected !== "string") return;
+
+    // Initialize .parallax scaffold
+    await invoke("create_workspace", { path: selected });
+    const info: any = await invoke("open_workspace", { path: selected });
+    currentWorkspace.path        = info.root;
+    currentWorkspace.name        = info.name;
+    currentWorkspace.gitBranch   = info.git_branch;
+    currentWorkspace.hasParallax = true;
+
+    loadedCollections.splice(0, loadedCollections.length);
+  }
+
   async function loadCollections(workspace: string) {
     const names: string[] = await invoke("list_collections", { workspace });
     const collections: Collection[] = [];
@@ -55,7 +76,7 @@
       try {
         const col: Collection = await invoke("load_collection", { workspace, name });
         collections.push(col);
-        expandedCols[col.name] = true; // auto-expand first load
+        expandedCols[col.name] = true;
       } catch { /* skip malformed */ }
     }
     loadedCollections.splice(0, loadedCollections.length, ...collections);
@@ -77,6 +98,7 @@
     activeRequest.auth        = defaultAuth();
   }
 
+  // ── Import collection ──────────────────────────────────────
   async function importCollection(e: Event) {
     importError = "";
     const file = (e.target as HTMLInputElement).files?.[0];
@@ -100,6 +122,65 @@
       importError = err?.message ?? "Import failed";
     }
     (e.target as HTMLInputElement).value = "";
+  }
+
+  // ── Export collection as Postman-compatible JSON ────────────
+  function exportCollection(colName: string) {
+    const col = loadedCollections.find(c => c.name === colName);
+    if (!col) return;
+
+    const postmanItems = [
+      ...col.requests.map(r => ({
+        name: r.name,
+        request: {
+          method: r.method,
+          url: { raw: r.url },
+          header: Object.entries(r.headers ?? {}).map(([key, value]) => ({ key, value })),
+          body: r.body ? { mode: "raw", raw: r.body.raw ?? "" } : undefined,
+        },
+      })),
+      ...col.folders.map(f => ({
+        name: f.name,
+        item: f.requests.map(r => ({
+          name: r.name,
+          request: {
+            method: r.method,
+            url: { raw: r.url },
+            header: Object.entries(r.headers ?? {}).map(([key, value]) => ({ key, value })),
+            body: r.body ? { mode: "raw", raw: r.body.raw ?? "" } : undefined,
+          },
+        })),
+      })),
+    ];
+
+    const exported = {
+      info: {
+        name: col.name,
+        description: col.description ?? "",
+        schema: "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+      },
+      item: postmanItems,
+      variable: Object.entries(col.variables ?? {}).map(([key, value]) => ({ key, value })),
+    };
+
+    const blob = new Blob([JSON.stringify(exported, null, 2)], { type: "application/json" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = `${col.name}.postman_collection.json`;
+    a.click();
+    URL.revokeObjectURL(a.href);
+    contextMenu = null;
+  }
+
+  async function deleteCollection(colName: string) {
+    if (!currentWorkspace.path) return;
+    try {
+      await invoke("delete_collection", { workspace: currentWorkspace.path, name: colName });
+      await loadCollections(currentWorkspace.path);
+    } catch (err: any) {
+      importError = err?.message ?? "Delete failed";
+    }
+    contextMenu = null;
   }
 
   function toggleCol(name: string) {
@@ -181,8 +262,9 @@
           <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" opacity="0.3">
             <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
           </svg>
-          <p>Open a workspace to see collections.</p>
+          <p>Open or create a workspace.</p>
           <button class="link-btn" onclick={openWorkspace}>Open folder →</button>
+          <button class="link-btn" onclick={createWorkspace}>Create workspace →</button>
         {/if}
       </div>
     {:else}
@@ -191,6 +273,7 @@
         <button
           class="col-header"
           onclick={() => toggleCol(col.name)}
+          oncontextmenu={(e) => { e.preventDefault(); contextMenu = { x: e.clientX, y: e.clientY, colName: col.name }; }}
           title={col.description ?? col.name}
         >
           <svg
@@ -263,6 +346,26 @@
       <span class="col-name">Dashboard</span>
     </button>
   </div>
+
+  <!-- Context menu -->
+  {#if contextMenu}
+    <button class="ctx-backdrop" aria-label="Close menu" onclick={closeContextMenu} oncontextmenu={(e) => { e.preventDefault(); closeContextMenu(); }}></button>
+    <div class="ctx-menu" style="left:{contextMenu.x}px;top:{contextMenu.y}px">
+      <button class="ctx-item" onclick={() => exportCollection(contextMenu!.colName)}>
+        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+          <polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/>
+        </svg>
+        Export as Postman JSON
+      </button>
+      <button class="ctx-item danger" onclick={() => deleteCollection(contextMenu!.colName)}>
+        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+        </svg>
+        Delete Collection
+      </button>
+    </div>
+  {/if}
 
   <!-- Env indicator + footer -->
   <div class="sidebar-footer">
@@ -544,4 +647,38 @@
     border-radius: 10px;
     flex-shrink: 0;
   }
+
+  /* Context menu */
+  .ctx-backdrop {
+    position: fixed;
+    inset: 0;
+    background: transparent;
+    z-index: 999;
+    border: none;
+    cursor: default;
+  }
+  .ctx-menu {
+    position: fixed;
+    z-index: 1000;
+    background: var(--bg-elevated);
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-lg);
+    padding: 4px 0;
+    min-width: 180px;
+  }
+  .ctx-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    padding: 6px 12px;
+    font-size: 12px;
+    background: transparent;
+    color: var(--text-secondary);
+    text-align: left;
+    transition: var(--transition-fast);
+  }
+  .ctx-item:hover { background: var(--bg-overlay); color: var(--text-primary); }
+  .ctx-item.danger:hover { background: var(--color-error-dim); color: var(--color-error); }
 </style>

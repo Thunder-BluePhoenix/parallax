@@ -1,6 +1,25 @@
 <script lang="ts">
-  import { invoke } from "@tauri-apps/api/core";
-  import { open } from "@tauri-apps/plugin-dialog";
+  import { invoke as tauriInvoke } from "@tauri-apps/api/core";
+  import { open as tauriOpen } from "@tauri-apps/plugin-dialog";
+
+  // Robust accessors for Tauri APIs
+  const invoke = (...args: any[]) => {
+    const fn = tauriInvoke || (window as any)?.__TAURI__?.core?.invoke;
+    if (!fn) {
+      console.error("[Parallax] Tauri invoke not found. Are you running in a browser?");
+      return Promise.reject("Tauri invoke not found");
+    }
+    return (fn as any)(...args);
+  };
+
+  const open = async (...args: any[]) => {
+    const fn = tauriOpen || (window as any)?.__TAURI__?.dialog?.open;
+    if (!fn) {
+      console.error("[Parallax] Tauri dialog:open not found.");
+      return Promise.reject("Tauri dialog:open not found");
+    }
+    return (fn as any)(...args);
+  };
   import {
     tabs, activeRequest, currentWorkspace, appMode, showRunner,
     loadedCollections, activeEnvironment, loadRequestIntoTab,

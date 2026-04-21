@@ -8,6 +8,7 @@ pub struct Collection {
     pub name: String,
     pub version: String,
     pub description: Option<String>,
+    pub variables: Option<std::collections::HashMap<String, String>>,
     pub requests: Vec<ParallaxRequest>,
     pub folders: Vec<CollectionFolder>,
 }

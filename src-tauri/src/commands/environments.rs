@@ -44,3 +44,25 @@ pub fn save_environment(workspace: String, env: Environment) -> Result<(), Strin
     let json = serde_json::to_string_pretty(&env).map_err(|e| e.to_string())?;
     fs::write(&path, json).map_err(|e| e.to_string())
 }
+
+#[tauri::command]
+pub fn load_globals(workspace: String) -> Result<Environment, String> {
+    let path = env_dir(&workspace).join("globals.json");
+    if !path.exists() {
+        return Ok(Environment {
+            name: "globals".to_string(),
+            variables: HashMap::new(),
+        });
+    }
+    let content = fs::read_to_string(&path).map_err(|e| e.to_string())?;
+    serde_json::from_str(&content).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn save_globals(workspace: String, env: Environment) -> Result<(), String> {
+    let dir = env_dir(&workspace);
+    fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
+    let path = dir.join("globals.json");
+    let json = serde_json::to_string_pretty(&env).map_err(|e| e.to_string())?;
+    fs::write(&path, json).map_err(|e| e.to_string())
+}

@@ -1,5 +1,9 @@
 <script lang="ts">
+  import { invoke } from "@tauri-apps/api/core";
+  import { onMount } from "svelte";
+
   let activeSection = $state<"health" | "loadtest" | "proxy" | "ecosystem">("health");
+  let workerConnected = $state(false);
 
   const sections = [
     { id: "health", label: "Health Monitor", icon: "❤" },
@@ -7,6 +11,20 @@
     { id: "proxy", label: "Traffic", icon: "🔀" },
     { id: "ecosystem", label: "Ecosystem", icon: "🔌" },
   ] as const;
+
+  async function checkWorkerStatus() {
+    try {
+      workerConnected = await invoke("ping_worker");
+    } catch {
+      workerConnected = false;
+    }
+  }
+
+  onMount(() => {
+    checkWorkerStatus();
+    const interval = setInterval(checkWorkerStatus, 5000);
+    return () => clearInterval(interval);
+  });
 </script>
 
 <div class="dashboard-mode">
@@ -14,7 +32,12 @@
   <div class="dashboard-nav">
     <div class="nav-header">
       <span class="nav-title">Command Center</span>
-      <span class="nav-subtitle">Go-powered workers</span>
+      <span class="nav-subtitle">
+        Go-worker: 
+        <span style="color: {workerConnected ? 'var(--color-success)' : 'var(--color-error)'}">
+          {workerConnected ? 'Connected' : 'Disconnected'}
+        </span>
+      </span>
     </div>
 
     {#each sections as section}
@@ -26,7 +49,7 @@
         <span class="nav-icon">{section.icon}</span>
         <span>{section.label}</span>
         {#if section.id === "health"}
-          <span class="status-dot up" title="Workers running"></span>
+          <span class="status-dot {workerConnected ? 'up' : 'down'}" title={workerConnected ? "Worker running" : "Worker down"}></span>
         {/if}
       </button>
     {/each}
@@ -281,6 +304,9 @@
   .status-dot.up {
     background: var(--color-success);
     animation: pulse-dot 2s infinite;
+  }
+  .status-dot.down {
+    background: var(--color-error);
   }
 
   /* Content */

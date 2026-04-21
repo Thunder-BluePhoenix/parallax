@@ -5,6 +5,8 @@ pub mod schema_explorer;
 pub mod commands;
 
 use tauri_plugin_shell::ShellExt;
+use commands::websocket::new_ws_state;
+use commands::sse::new_sse_state;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -27,6 +29,8 @@ pub fn run() {
             commands::environments::list_environments,
             commands::environments::load_environment,
             commands::environments::save_environment,
+            commands::environments::load_globals,
+            commands::environments::save_globals,
             // Auth Providers
             commands::auth::detect_framework,
             commands::auth::perform_auth,
@@ -37,7 +41,19 @@ pub fn run() {
             // Workspace
             commands::workspace::open_workspace,
             commands::workspace::get_workspace_info,
+            commands::workspace::get_current_branch,
+            // Worker
+            commands::worker::ping_worker,
+            // WebSocket
+            commands::websocket::ws_connect,
+            commands::websocket::ws_send,
+            commands::websocket::ws_disconnect,
+            // SSE
+            commands::sse::sse_connect,
+            commands::sse::sse_disconnect,
         ])
+        .manage(new_ws_state())
+        .manage(new_sse_state())
         .setup(|app| {
             // Start Go sidecar worker (non-fatal in dev if binary not yet compiled)
             match app.shell().sidecar("parallax-worker") {

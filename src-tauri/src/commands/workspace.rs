@@ -53,6 +53,15 @@ pub async fn get_workspace_info(path: String) -> Result<WorkspaceInfo, String> {
     open_workspace(path).await
 }
 
+#[tauri::command]
+pub async fn get_current_branch(path: String) -> Result<Option<String>, String> {
+    let head_file = PathBuf::from(&path).join(".git/HEAD");
+    let branch = std::fs::read_to_string(head_file)
+        .ok()
+        .and_then(|s| s.trim().strip_prefix("ref: refs/heads/").map(String::from));
+    Ok(branch)
+}
+
 fn count_files_with_ext(dir: &PathBuf, ext: &str) -> usize {
     std::fs::read_dir(dir)
         .map(|dir| {

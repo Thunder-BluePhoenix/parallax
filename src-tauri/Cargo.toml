@@ -16,6 +16,7 @@ path = "src/main.rs"
 
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
+tonic-build = "0.12"
 
 [dependencies]
 tauri = { version = "2", features = ["tray-icon", "image-png"] }
@@ -41,6 +42,8 @@ prost = "0.13"
 futures = "0.3"
 walkdir = "2"
 percent-encoding = "2.3"
+tokio-tungstenite = { version = "0.24", features = ["rustls-tls-webpki-roots"] }
+futures-util = "0.3"
 
 [features]
 custom-protocol = ["tauri/custom-protocol"]

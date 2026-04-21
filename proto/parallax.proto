@@ -5,6 +5,13 @@ package parallax;
 option go_package = "github.com/bluephoenix/parallax-worker/proto";
 
 // =============================================================================
+// Core Worker Service
+// =============================================================================
+service WorkerService {
+  rpc Ping(GenericRequest) returns (GenericResponse);
+}
+
+// =============================================================================
 // Load Test Service
 // =============================================================================
 service LoadTestService {

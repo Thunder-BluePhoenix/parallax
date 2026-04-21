@@ -28,13 +28,14 @@ export interface CollectionFolder { name: string; requests: CollectionRequest[];
 export interface Collection {
   name: string; version: string; description?: string;
   requests: CollectionRequest[]; folders: CollectionFolder[];
+  variables?: Record<string, string>;
 }
 export const loadedCollections = $state<Collection[]>([]);
 
 // ============================================================
 // Request state
 // ============================================================
-export type HttpMethod = "GET" | "POST" | "PUT" | "PATCH" | "DELETE" | "HEAD" | "OPTIONS";
+export type HttpMethod = "GET" | "POST" | "PUT" | "PATCH" | "DELETE" | "HEAD" | "OPTIONS" | "WS" | "SSE";
 export interface AuthState {
   type: "none" | "bearer" | "basic" | "api_key" | "ecosystem_provider";
   token: string; username: string; password: string;
@@ -80,10 +81,18 @@ export interface HistoryEntry {
 export const responseHistory = $state<HistoryEntry[]>([]);
 
 // ============================================================
-// Environment
+// Environment & Global Scopes
 // ============================================================
 export const activeEnvironment = $state<{ name: string; variables: Record<string, string> }>({
   name: "No Environment", variables: {},
+});
+
+export const globalVariables = $state<{ variables: Record<string, string> }>({
+  variables: {},
+});
+
+export const collectionVariables = $state<{ variables: Record<string, string> }>({
+  variables: {},
 });
 
 // ============================================================
@@ -138,6 +147,17 @@ export function loadRequestIntoTab(req: CollectionRequest) {
     activeRequest.auth.apiKeyHeader = a.api_key_header ?? "X-API-Key";
     activeRequest.auth.apiKeyValue  = a.api_key_value ?? "";
     activeRequest.auth.provider     = a.provider ?? "frappe";
+  }
+
+  // Load collection variables if we can find the parent collection
+  const parentCol = loadedCollections.find(c =>
+    c.requests.some(r => r.id === req.id) ||
+    c.folders.some(f => f.requests.some(r => r.id === req.id))
+  );
+  if (parentCol && parentCol.variables) {
+    collectionVariables.variables = { ...parentCol.variables };
+  } else {
+    collectionVariables.variables = {};
   }
   const existing = tabs.list.find((t) => t.id === req.id);
   if (existing) {
@@ -228,17 +248,25 @@ export async function sendRequest() {
   const t0 = Date.now();
 
   try {
+    // Merge scopes: Global -> Collection -> Environment
+    // Local script variables will mutate this merged object during pre-request
+    const mergedEnv = {
+      ...globalVariables.variables,
+      ...collectionVariables.variables,
+      ...activeEnvironment.variables,
+    };
+
     // Run pre-request script
     if (activeScripts.preRequest.trim()) {
       const { runPreRequestScript } = await import("../utils/pm-script-runner");
-      await runPreRequestScript(activeScripts.preRequest, activeEnvironment.variables);
+      await runPreRequestScript(activeScripts.preRequest, mergedEnv);
     }
 
-    const payload = resolveRequestTemplates(buildPayload(), activeEnvironment.variables);
+    const payload = resolveRequestTemplates(buildPayload(), mergedEnv);
 
     const result = await invoke<any>("send_request", {
       request:     payload,
-      environment: { ...activeEnvironment.variables },
+      environment: mergedEnv,
     });
 
     const response: ResponseState = {
@@ -259,7 +287,7 @@ export async function sendRequest() {
     // Run test script
     if (activeScripts.tests.trim()) {
       const { runTestScript } = await import("../utils/pm-script-runner");
-      const results = await runTestScript(activeScripts.tests, response, activeEnvironment.variables);
+      const results = await runTestScript(activeScripts.tests, response, mergedEnv);
       testResults.results = results;
       testResults.ran     = true;
     }

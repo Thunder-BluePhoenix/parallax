@@ -2,10 +2,12 @@
   import { tabs, activeRequest, responseState, sendRequest } from "../../stores/app.svelte";
   import RequestPanel from "./RequestPanel.svelte";
   import ResponsePanel from "./ResponsePanel.svelte";
+  import WebSocketPane from "./WebSocketPane.svelte";
+  import SSEPane from "./SSEPane.svelte";
 
   let activeTab = $state("params");
 
-  const METHODS = ["GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"] as const;
+  const METHODS = ["GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS", "WS", "SSE"] as const;
 
   function onKeydown(e: KeyboardEvent) {
     if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
@@ -74,26 +76,34 @@
       bind:value={activeRequest.url}
     />
 
-    <button
-      class="btn-send"
-      class:loading={responseState.loading}
-      onclick={sendRequest}
-      disabled={responseState.loading}
-    >
-      {#if responseState.loading}
-        <span class="spinner"></span>
-        Sending…
-      {:else}
-        Send
-      {/if}
-    </button>
+    {#if activeRequest.method !== "WS" && activeRequest.method !== "SSE"}
+      <button
+        class="btn-send"
+        class:loading={responseState.loading}
+        onclick={sendRequest}
+        disabled={responseState.loading}
+      >
+        {#if responseState.loading}
+          <span class="spinner"></span>
+          Sending…
+        {:else}
+          Send
+        {/if}
+      </button>
+    {/if}
   </div>
 
   <!-- Body: request left, response right -->
   <div class="panels">
     <RequestPanel bind:activeTab />
     <div class="panel-resize-handle"></div>
-    <ResponsePanel />
+    {#if activeRequest.method === "WS"}
+      <WebSocketPane />
+    {:else if activeRequest.method === "SSE"}
+      <SSEPane />
+    {:else}
+      <ResponsePanel />
+    {/if}
   </div>
 </div>
 
@@ -214,6 +224,8 @@
   .method-select.method-DELETE { background: rgba(248,81,73,0.12); color: var(--method-delete); border-color: rgba(248,81,73,0.3); }
   .method-select.method-HEAD { background: rgba(88,166,255,0.12); color: var(--method-head); border-color: rgba(88,166,255,0.3); }
   .method-select.method-OPTIONS { background: rgba(188,140,255,0.12); color: var(--method-options); border-color: rgba(188,140,255,0.3); }
+  .method-select.method-WS { background: rgba(0,255,255,0.12); color: #00ffff; border-color: rgba(0,255,255,0.3); }
+  .method-select.method-SSE { background: rgba(255,0,255,0.12); color: #ff00ff; border-color: rgba(255,0,255,0.3); }
 
   .url-input {
     flex: 1;

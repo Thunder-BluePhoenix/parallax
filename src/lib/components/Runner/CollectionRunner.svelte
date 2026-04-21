@@ -7,7 +7,11 @@
     responseHistory,
     testResults
   } from "../../stores/app.svelte";
-  import { invoke } from "@tauri-apps/api/core";
+  import { invoke as tauriInvoke } from "@tauri-apps/api/core";
+  const invoke = <T>(cmd: string, args?: Record<string, any>): Promise<T> => {
+    const fn = tauriInvoke || (window as any)?.__TAURI__?.core?.invoke;
+    return fn ? (fn as any)(cmd, args) : Promise.reject("Tauri invoke not found");
+  };
   import { resolveRequestTemplates } from "../../utils/template-tags";
   import { runPreRequestScript, runTestScript } from "../../utils/pm-script-runner";
   import type { CollectionRequest, ResponseState, TestResult } from "../../stores/app.svelte";

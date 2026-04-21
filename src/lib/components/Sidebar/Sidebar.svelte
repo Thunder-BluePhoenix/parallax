@@ -1,22 +1,23 @@
 <script lang="ts">
   import { invoke as tauriInvoke } from "@tauri-apps/api/core";
   import { open as tauriOpen } from "@tauri-apps/plugin-dialog";
+  import Logo from "../Common/Logo.svelte";
 
   // Robust accessors for Tauri APIs
-  const invoke = (...args: any[]) => {
+  const invoke = <T>(cmd: string, args?: Record<string, any>): Promise<T> => {
     const fn = tauriInvoke || (window as any)?.__TAURI__?.core?.invoke;
     if (!fn) {
       console.error("[Parallax] Tauri invoke not found. Are you running in a browser?");
       return Promise.reject("Tauri invoke not found");
     }
-    return (fn as any)(...args);
+    return (fn as any)(cmd, args);
   };
 
   const open = async (...args: any[]) => {
     const fn = tauriOpen || (window as any)?.__TAURI__?.dialog?.open;
     if (!fn) {
-      console.error("[Parallax] Tauri dialog:open not found.");
-      return Promise.reject("Tauri dialog:open not found");
+      console.warn("[Parallax] Tauri dialog:open not found.");
+      return null;
     }
     return (fn as any)(...args);
   };
@@ -56,12 +57,20 @@
   // ── Context menu state ─────────────────────────────────────
   let contextMenu = $state<{ x: number; y: number; colName: string } | null>(null);
 
-  function closeContextMenu() { contextMenu = null; }
+  function closeContextMenu() { 
+    console.log("[Sidebar] Closing context menu");
+    contextMenu = null; 
+  }
 
   // ── Open workspace folder ──────────────────────────────────
   async function openWorkspace() {
+    console.log("[Sidebar] openWorkspace triggered");
     const selected = await open({ directory: true, multiple: false, title: "Open Workspace" });
-    if (!selected || typeof selected !== "string") return;
+    if (!selected) {
+      if (selected === null) alert("Tauri Dialog plugin failed to load. Check your configuration.");
+      return;
+    }
+    if (typeof selected !== "string") return;
 
     const info: any = await invoke("open_workspace", { path: selected });
     currentWorkspace.path      = info.root;
@@ -74,8 +83,13 @@
 
   // ── Create new workspace ───────────────────────────────────
   async function createWorkspace() {
+    console.log("[Sidebar] createWorkspace triggered");
     const selected = await open({ directory: true, multiple: false, title: "Choose folder for new workspace" });
-    if (!selected || typeof selected !== "string") return;
+    if (!selected) {
+      if (selected === null) alert("Tauri Dialog plugin failed to load. Check your configuration.");
+      return;
+    }
+    if (typeof selected !== "string") return;
 
     // Initialize .parallax scaffold
     await invoke("create_workspace", { path: selected });
@@ -241,7 +255,7 @@
         <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
       </svg>
     </button>
-    <button class="icon-btn" onclick={() => (showRunner.value = true)} title="Collection Runner">
+    <button class="icon-btn" onclick={() => { console.log("[Sidebar] Runner clicked"); showRunner.value = true; }} title="Collection Runner">
       <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
         <polygon points="5 3 19 12 5 21 5 3"/>
       </svg>
@@ -357,7 +371,10 @@
 
     <!-- Ecosystem section -->
     <div class="section-sep"></div>
-    <button class="col-header eco" onclick={() => (appMode.value = "dashboard")}>
+    <button class="col-header eco" onclick={() => { 
+      console.log("[Sidebar] Dashboard button clicked. Current mode:", appMode.value);
+      appMode.value = "dashboard"; 
+    }}>
       <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
         <rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/>
         <rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/>

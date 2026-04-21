@@ -1,5 +1,6 @@
 <script lang="ts">
   import { appMode, currentWorkspace } from "../stores/app.svelte";
+  import Logo from "./Common/Logo.svelte";
 
   function toggleMode() {
     appMode.value = appMode.value === "builder" ? "dashboard" : "builder";
@@ -9,17 +10,7 @@
 <header class="titlebar" data-tauri-drag-region>
   <div class="titlebar-left">
     <div class="logo">
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
-        <circle cx="12" cy="12" r="3" fill="var(--accent-primary)" />
-        <circle cx="5" cy="5" r="2" fill="var(--accent-secondary)" opacity="0.7" />
-        <circle cx="19" cy="5" r="1.5" fill="var(--accent-primary)" opacity="0.5" />
-        <circle cx="5" cy="19" r="1.5" fill="var(--accent-secondary)" opacity="0.4" />
-        <circle cx="19" cy="19" r="2" fill="var(--accent-primary)" opacity="0.6" />
-        <line x1="12" y1="12" x2="5" y2="5" stroke="var(--accent-primary)" stroke-width="0.5" opacity="0.3" />
-        <line x1="12" y1="12" x2="19" y2="5" stroke="var(--accent-secondary)" stroke-width="0.5" opacity="0.3" />
-        <line x1="12" y1="12" x2="5" y2="19" stroke="var(--accent-secondary)" stroke-width="0.5" opacity="0.3" />
-        <line x1="12" y1="12" x2="19" y2="19" stroke="var(--accent-primary)" stroke-width="0.5" opacity="0.3" />
-      </svg>
+      <Logo size={20} hasBackground={true} />
       <span class="logo-text">Parallax</span>
     </div>
 
@@ -68,13 +59,13 @@
   </div>
 
   <div class="titlebar-right">
-    <button class="titlebar-action" title="Settings">
+    <button class="titlebar-action" title="Settings" onclick={() => alert("Settings coming soon!")}>
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
         <circle cx="12" cy="12" r="3"/>
         <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/>
       </svg>
     </button>
-    <button class="titlebar-action" title="AI Assistant">
+    <button class="titlebar-action" title="AI Assistant" onclick={() => alert("AI Assistant coming soon!")}>
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
         <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/>
         <polyline points="3.27 6.96 12 12.01 20.73 6.96"/>

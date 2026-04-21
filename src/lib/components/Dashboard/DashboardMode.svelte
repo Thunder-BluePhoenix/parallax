@@ -1,8 +1,14 @@
 <script lang="ts">
-  import { invoke } from "@tauri-apps/api/core";
+  import { invoke as tauriInvoke } from "@tauri-apps/api/core";
   import { onMount } from "svelte";
+  import Logo from "../Common/Logo.svelte";
   import HealthHeatmapPanel from "./HealthHeatmapPanel.svelte";
   import LiveTrafficPanel from "./LiveTrafficPanel.svelte";
+
+  const invoke = <T>(cmd: string, args?: Record<string, any>): Promise<T> => {
+    const fn = tauriInvoke || (window as any)?.__TAURI__?.core?.invoke;
+    return fn ? (fn as any)(cmd, args) : Promise.reject("Tauri invoke not found");
+  };
 
   let activeSection = $state<"health" | "loadtest" | "proxy" | "ecosystem">("health");
   let workerConnected = $state(false);
@@ -17,7 +23,9 @@
   async function checkWorkerStatus() {
     try {
       workerConnected = await invoke("ping_worker");
-    } catch {
+      console.log("[Dashboard] Worker status:", workerConnected);
+    } catch (e) {
+      console.error("[Dashboard] Worker status check failed:", e);
       workerConnected = false;
     }
   }
@@ -33,7 +41,10 @@
   <!-- Dashboard nav -->
   <div class="dashboard-nav">
     <div class="nav-header">
-      <span class="nav-title">Command Center</span>
+      <div style="display:flex; align-items:center; gap:8px;">
+        <Logo size={16} />
+        <span class="nav-title">Command Center</span>
+      </div>
       <span class="nav-subtitle">
         Go-worker: 
         <span style="color: {workerConnected ? 'var(--color-success)' : 'var(--color-error)'}">
@@ -362,13 +373,14 @@
   .fw-badge {
     width: 36px;
     height: 36px;
-    border-radius: var(--radius-md);
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 14px;
     font-weight: 800;
+    font-size: 15px;
+    border-radius: var(--radius-md);
     flex-shrink: 0;
+    font-family: var(--font-mono);
   }
 
   .fw-info { flex: 1; }

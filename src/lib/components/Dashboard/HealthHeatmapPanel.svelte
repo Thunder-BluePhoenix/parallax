@@ -2,6 +2,7 @@
   import { invoke } from "@tauri-apps/api/core";
   import { listen } from "@tauri-apps/api/event";
   import { onMount, onDestroy } from "svelte";
+  import Logo from "../Common/Logo.svelte";
 
   // Types
   interface HealthEvent {
@@ -110,7 +111,10 @@
     {#each Object.values(statuses) as svc (svc.id)}
       <div class="health-card status-{svc.status}">
         <div class="health-card-header">
-          <span class="health-name">{svc.name}</span>
+          <div style="display:flex; align-items:center; gap:6px;">
+            <Logo size={12} />
+            <span class="health-name">{svc.name}</span>
+          </div>
           <div class="header-actions">
             <span class="health-status {svc.status === 'up' ? 'status-2xx' : 'status-5xx'}">
               <span class="pulse-dot" class:up={svc.status === 'up'}></span>

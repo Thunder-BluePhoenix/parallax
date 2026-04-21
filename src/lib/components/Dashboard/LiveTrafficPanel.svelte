@@ -2,6 +2,7 @@
   import { invoke } from "@tauri-apps/api/core";
   import { listen } from "@tauri-apps/api/event";
   import { onMount, onDestroy } from "svelte";
+  import Logo from "../Common/Logo.svelte";
 
   interface TrafficEvent {
     id: string;
@@ -68,7 +69,7 @@
 
   <div class="proxy-controls">
     <div class="proxy-status">
-      <span class="pulse-dot up"></span>
+      <Logo size={14} />
       <span>Proxy listening on <span class="mono" style="color:var(--accent-secondary)">127.0.0.1:8888</span></span>
     </div>
     <button class="btn-action" onclick={clearTraffic}>Clear Traffic</button>

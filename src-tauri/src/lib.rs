@@ -51,6 +51,14 @@ pub fn run() {
             // SSE
             commands::sse::sse_connect,
             commands::sse::sse_disconnect,
+            // Dashboard (Proxy & Health)
+            commands::proxy::start_proxy_stream,
+            commands::proxy::get_proxy_traffic,
+            commands::proxy::clear_proxy_traffic,
+            commands::health::start_health_stream,
+            commands::health::add_health_target,
+            commands::health::remove_health_target,
+            commands::health::get_health_statuses,
         ])
         .manage(new_ws_state())
         .manage(new_sse_state())

@@ -1,6 +1,8 @@
 <script lang="ts">
   import { invoke } from "@tauri-apps/api/core";
   import { onMount } from "svelte";
+  import HealthHeatmapPanel from "./HealthHeatmapPanel.svelte";
+  import LiveTrafficPanel from "./LiveTrafficPanel.svelte";
 
   let activeSection = $state<"health" | "loadtest" | "proxy" | "ecosystem">("health");
   let workerConnected = $state(false);
@@ -58,53 +60,7 @@
   <!-- Dashboard content -->
   <div class="dashboard-content">
     {#if activeSection === "health"}
-      <div class="dashboard-section animate-fade-in">
-        <div class="section-header">
-          <h2>Health Monitor</h2>
-          <p class="section-desc">Real-time background health checks via Go goroutines</p>
-        </div>
-
-        <div class="add-target-form">
-          <input type="text" placeholder="Service name" class="form-input" />
-          <input type="text" placeholder="https://api.example.com/health" class="form-input flex-1" />
-          <select class="form-select">
-            <option value="30">30s</option>
-            <option value="60">1m</option>
-            <option value="300">5m</option>
-          </select>
-          <button class="btn-action">Add Monitor</button>
-        </div>
-
-        <div class="health-grid">
-          <!-- Demo placeholders -->
-          {#each [
-            { name: "Frappe Dev", url: "http://localhost:8000", status: "up", latency: 42 },
-            { name: "Redis", url: "localhost:6379", status: "up", latency: 0.8 },
-            { name: "Local API", url: "http://localhost:5000", status: "down", latency: 0 },
-          ] as svc}
-            <div class="health-card status-{svc.status}">
-              <div class="health-card-header">
-                <span class="health-name">{svc.name}</span>
-                <span class="health-status {svc.status === "up" ? "status-2xx" : "status-5xx"}">
-                  <span class="pulse-dot" class:up={svc.status === "up"}></span>
-                  {svc.status.toUpperCase()}
-                </span>
-              </div>
-              <div class="health-url text-muted mono">{svc.url}</div>
-              {#if svc.status === "up"}
-                <div class="health-latency">
-                  <span class="latency-bar-wrap">
-                    <span class="latency-bar" style="width: {Math.min(svc.latency / 2, 100)}%"></span>
-                  </span>
-                  <span class="latency-val">{svc.latency}ms</span>
-                </div>
-              {:else}
-                <div class="health-error text-muted">Connection refused</div>
-              {/if}
-            </div>
-          {/each}
-        </div>
-      </div>
+      <HealthHeatmapPanel />
 
     {:else if activeSection === "loadtest"}
       <div class="dashboard-section animate-fade-in">
@@ -170,33 +126,7 @@
       </div>
 
     {:else if activeSection === "proxy"}
-      <div class="dashboard-section animate-fade-in">
-        <div class="section-header">
-          <h2>Traffic Interceptor</h2>
-          <p class="section-desc">Configure your app to use the local proxy on port 8888</p>
-        </div>
-
-        <div class="proxy-controls">
-          <div class="proxy-status">
-            <span class="pulse-dot up"></span>
-            <span>Proxy listening on <span class="mono" style="color:var(--accent-secondary)">127.0.0.1:8888</span></span>
-          </div>
-          <button class="btn-action">Clear Traffic</button>
-        </div>
-
-        <div class="traffic-list">
-          <div class="traffic-header">
-            <span style="width:60px">Method</span>
-            <span style="flex:2">URL</span>
-            <span style="width:60px">Status</span>
-            <span style="width:70px">Latency</span>
-            <span style="width:70px">Size</span>
-          </div>
-          <div class="traffic-empty">
-            <span class="text-muted">Traffic will appear here once your app sends requests through the proxy</span>
-          </div>
-        </div>
-      </div>
+      <LiveTrafficPanel />
 
     {:else if activeSection === "ecosystem"}
       <div class="dashboard-section animate-fade-in">
@@ -314,13 +244,9 @@
     flex: 1;
     overflow-y: auto;
     padding: 24px;
+    display: flex;
+    flex-direction: column;
   }
-
-  .dashboard-section { max-width: 900px; }
-
-  .section-header { margin-bottom: 20px; }
-  .section-header h2 { font-size: 18px; font-weight: 700; margin-bottom: 4px; }
-  .section-desc { font-size: 12px; color: var(--text-secondary); }
 
   /* Forms */
   .add-target-form, .config-row, .explorer-input {
@@ -371,61 +297,6 @@
   .btn-action:hover { border-color: var(--accent-primary); color: var(--accent-primary); }
   .btn-action.danger:hover { border-color: var(--color-error); color: var(--color-error); }
 
-  /* Health grid */
-  .health-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
-    gap: 12px;
-  }
-
-  .health-card {
-    background: var(--bg-surface);
-    border: 1px solid var(--border-default);
-    border-radius: var(--radius-lg);
-    padding: 14px;
-    transition: var(--transition-base);
-  }
-  .health-card.status-up { border-color: rgba(63, 185, 80, 0.2); }
-  .health-card.status-down { border-color: rgba(248, 81, 73, 0.2); }
-
-  .health-card-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 4px;
-  }
-  .health-name { font-weight: 600; font-size: 13px; }
-  .health-status {
-    display: flex;
-    align-items: center;
-    gap: 5px;
-    font-size: 10px;
-    font-weight: 700;
-    font-family: var(--font-mono);
-  }
-  .health-url { font-size: 11px; margin-bottom: 10px; }
-
-  .latency-bar-wrap {
-    flex: 1;
-    height: 3px;
-    background: var(--bg-overlay);
-    border-radius: 2px;
-    overflow: hidden;
-    display: block;
-  }
-  .latency-bar {
-    height: 100%;
-    background: var(--color-success);
-    display: block;
-  }
-  .health-latency {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-  }
-  .latency-val { font-size: 11px; font-family: var(--font-mono); color: var(--text-secondary); }
-  .health-error { font-size: 11px; margin-top: 6px; }
-
   /* Load test */
   .loadtest-config {
     background: var(--bg-surface);
@@ -465,41 +336,6 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 12px;
-  }
-
-  /* Proxy */
-  .proxy-controls {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    margin-bottom: 16px;
-  }
-  .proxy-status { display: flex; align-items: center; gap: 8px; font-size: 13px; flex: 1; }
-
-  .traffic-list {
-    background: var(--bg-surface);
-    border: 1px solid var(--border-default);
-    border-radius: var(--radius-lg);
-    overflow: hidden;
-  }
-
-  .traffic-header {
-    display: flex;
-    gap: 12px;
-    padding: 8px 12px;
-    background: var(--bg-elevated);
-    border-bottom: 1px solid var(--border-default);
-    font-size: 10px;
-    font-weight: 700;
-    color: var(--text-muted);
-    text-transform: uppercase;
-    letter-spacing: 0.06em;
-  }
-
-  .traffic-empty {
-    padding: 40px;
-    text-align: center;
     font-size: 12px;
   }
 

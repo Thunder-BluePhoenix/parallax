@@ -7,3 +7,5 @@ pub mod workspace;
 pub mod worker;
 pub mod websocket;
 pub mod sse;
+pub mod proxy;
+pub mod health;

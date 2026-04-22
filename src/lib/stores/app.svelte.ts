@@ -27,6 +27,7 @@ export interface CollectionRequest {
   params?: Record<string, string>;
   body?: { type: string; content: any; raw?: string } | null;
   auth?: any | null;
+  scripts?: { preRequest?: string; tests?: string } | null;
 }
 export interface CollectionFolder { name: string; requests: CollectionRequest[]; }
 export interface Collection {
@@ -181,6 +182,13 @@ export function loadRequestIntoTab(req: CollectionRequest) {
     activeRequest.auth.apiKeyValue    = a.api_key_value ?? "";
     activeRequest.auth.apiKeyLocation = (a.api_key_location === "query") ? "query" : "header";
     activeRequest.auth.provider     = a.provider ?? "frappe";
+  }
+  if (req.scripts) {
+    activeScripts.preRequest = req.scripts.preRequest ?? "";
+    activeScripts.tests = req.scripts.tests ?? "";
+  } else {
+    activeScripts.preRequest = "";
+    activeScripts.tests = "";
   }
 
   // Load collection variables if we can find the parent collection
@@ -364,6 +372,7 @@ function buildPayload() {
     id: activeRequest.id, name: activeRequest.name, method: activeRequest.method,
     url: activeRequest.url, headers: activeRequest.headers, params: activeRequest.params,
     body: buildBody(), auth: buildAuth(), timeout_ms: 30000, follow_redirects: true,
+    scripts: { preRequest: activeScripts.preRequest, tests: activeScripts.tests }
   };
 }
 function buildBody() {

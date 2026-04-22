@@ -4,17 +4,22 @@ package health
 
 import (
 	"context"
+	"fmt"
 	"net/http"
+	"strings"
 	"sync"
 	"time"
+
+	"github.com/bluephoenix/parallax-worker/storage"
 )
 
 type ServiceTarget struct {
-	ID          string `json:"id"`
-	Name        string `json:"name"`
-	URL         string `json:"url"`
-	IntervalSec int    `json:"interval_sec"`
-	Timeout     int    `json:"timeout_ms"`
+	ID           string `json:"id"`
+	Name         string `json:"name"`
+	URL          string `json:"url"`
+	IntervalSec  int    `json:"interval_sec"`
+	Timeout      int    `json:"timeout_ms"`
+	AlertWebhook string `json:"alert_webhook"`
 }
 
 type ServiceStatus struct {
@@ -34,13 +39,15 @@ type Monitor struct {
 	statuses map[string]*ServiceStatus
 	watchers map[string]context.CancelFunc
 	onChange func(ServiceStatus)
+	store    *storage.Storage
 }
 
-func New() *Monitor {
+func New(store *storage.Storage) *Monitor {
 	return &Monitor{
 		targets:  make(map[string]*ServiceTarget),
 		statuses: make(map[string]*ServiceStatus),
 		watchers: make(map[string]context.CancelFunc),
+		store:    store,
 	}
 }
 
@@ -158,8 +165,28 @@ func (m *Monitor) check(target *ServiceTarget) {
 	}
 
 	m.mu.Lock()
+	prevStatus := m.statuses[target.ID]
 	m.statuses[target.ID] = status
 	m.mu.Unlock()
+
+	// Trigger webhook if status changed to 'down'
+	if target.AlertWebhook != "" && status.Status == "down" && (prevStatus == nil || prevStatus.Status != "down") {
+		go func() {
+			client := &http.Client{Timeout: 5 * time.Second}
+			payload := fmt.Sprintf(`{"service_id": "%s", "name": "%s", "status": "down", "error": "%s"}`, status.ID, status.Name, status.ErrorMsg)
+			req, _ := http.NewRequest("POST", target.AlertWebhook, strings.NewReader(payload))
+			req.Header.Set("Content-Type", "application/json")
+			client.Do(req)
+		}()
+	}
+
+	if m.store != nil {
+		m.store.SaveHealthStatus(
+			fmt.Sprintf("%s-%d", status.ID, status.LastChecked),
+			status.ID, status.Name, status.URL, status.Status,
+			status.LatencyMs, status.StatusCode, status.LastChecked, status.ErrorMsg,
+		)
+	}
 
 	if m.onChange != nil {
 		m.onChange(*status)

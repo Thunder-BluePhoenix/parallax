@@ -30,7 +30,7 @@ interface PostmanCollection {
   variable?: { key: string; value: string }[];
 }
 
-function extractUrl(url: PostmanItem["request"]["url"]): string {
+function extractUrl(url: any): string {
   if (!url) return "";
   if (typeof url === "string") return url;
   return url.raw ?? "";
@@ -44,20 +44,20 @@ function extractHeaders(headers?: { key: string; value: string; disabled?: boole
   return result;
 }
 
-function extractBody(body?: PostmanItem["request"]["body"]): CollectionRequest["body"] {
+function extractBody(body?: any): CollectionRequest["body"] {
   if (!body) return null;
   switch (body.mode) {
     case "raw":
       return { type: "json", content: null, raw: body.raw ?? "" };
     case "urlencoded": {
       const pairs = Object.fromEntries(
-        (body.urlencoded ?? []).filter(p => !p.disabled).map(p => [p.key, p.value])
+        (body.urlencoded ?? []).filter((p: any) => !p.disabled).map((p: any) => [p.key, p.value])
       );
       return { type: "urlencoded", content: pairs, raw: JSON.stringify(pairs) };
     }
     case "formdata": {
       const pairs = Object.fromEntries(
-        (body.formdata ?? []).filter(p => !p.disabled).map(p => [p.key, p.value])
+        (body.formdata ?? []).filter((p: any) => !p.disabled).map((p: any) => [p.key, p.value])
       );
       return { type: "form", content: pairs, raw: JSON.stringify(pairs) };
     }
@@ -72,7 +72,7 @@ function extractBody(body?: PostmanItem["request"]["body"]): CollectionRequest["
   }
 }
 
-function extractAuth(auth?: PostmanItem["request"]["auth"]): CollectionRequest["auth"] {
+function extractAuth(auth?: any): CollectionRequest["auth"] {
   if (!auth || auth.type === "noauth") return null;
   const get = (arr: { key: string; value: string }[] | undefined, k: string) =>
     arr?.find(x => x.key === k)?.value ?? "";

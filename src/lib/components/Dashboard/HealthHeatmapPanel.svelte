@@ -2,6 +2,7 @@
   import { invoke } from "@tauri-apps/api/core";
   import { listen } from "@tauri-apps/api/event";
   import { onMount, onDestroy } from "svelte";
+  import { sendNotification } from "@tauri-apps/plugin-notification";
   import Logo from "../Common/Logo.svelte";
 
   // Types
@@ -21,6 +22,7 @@
   let newName = $state("");
   let newUrl = $state("");
   let newInterval = $state(30);
+  let newWebhook = $state("");
 
   let unlisten: () => void;
 
@@ -45,9 +47,11 @@
         url: newUrl,
         intervalSec: newInterval,
         timeoutMs: 5000,
+        alertWebhook: newWebhook
       });
       newName = "";
       newUrl = "";
+      newWebhook = "";
       // The Go sidecar will do an initial check and fire an event back
     } catch (e) {
       console.error("Failed to add target:", e);
@@ -71,7 +75,17 @@
 
     // Listen to events from Rust
     unlisten = await listen<HealthEvent>("health_status_event", (event) => {
+      const prev = statuses[event.payload.id];
       statuses[event.payload.id] = event.payload;
+
+      // Desktop Notification on state change
+      if (prev && prev.status !== event.payload.status) {
+        if (event.payload.status === "down") {
+          sendNotification({ title: `Service Down: ${event.payload.name}`, body: event.payload.error_msg || "Health check failed." });
+        } else if (event.payload.status === "up" && prev.status === "down") {
+          sendNotification({ title: `Service Restored: ${event.payload.name}`, body: "Service is back online." });
+        }
+      }
     });
   });
 
@@ -103,6 +117,10 @@
         <option value={60}>1m</option>
         <option value={300}>5m</option>
       </select>
+    </div>
+    <div class="config-field">
+      <label for="h-webhook">Webhook (Optional)</label>
+      <input id="h-webhook" type="text" placeholder="https://alerts.my..." class="form-input" bind:value={newWebhook} />
     </div>
     <button class="btn-action" onclick={addTarget} disabled={!newName || !newUrl}>Add Monitor</button>
   </div>

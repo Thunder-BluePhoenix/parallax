@@ -52,6 +52,10 @@ pub fn run() {
             // SSE
             commands::sse::sse_connect,
             commands::sse::sse_disconnect,
+            // Load Test
+            commands::loadtest::run_load_test,
+            commands::mock::add_mock_rule,
+            commands::mock::remove_mock_rule,
             // Dashboard (Proxy & Health)
             commands::proxy::start_proxy_stream,
             commands::proxy::get_proxy_traffic,

@@ -1,6 +1,6 @@
 <script lang="ts">
   // Stub for auth panel — wired up in Phase 3
-  export let provider = "";
+  let { provider = "" } = $props<{ provider?: string }>();
 </script>
 
 <div class="auth-stub">

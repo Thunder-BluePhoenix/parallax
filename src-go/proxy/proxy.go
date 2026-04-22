@@ -10,9 +10,13 @@ import (
 	"log"
 	"net"
 	"net/http"
+	"os"
+	"path/filepath"
 	"sync"
 	"sync/atomic"
 	"time"
+
+	"github.com/bluephoenix/parallax-worker/storage"
 )
 
 type TrafficEntry struct {
@@ -38,13 +42,26 @@ type Proxy struct {
 	onTraffic func(TrafficEntry)
 	counter  atomic.Int64
 	active   bool
+	store    *storage.Storage
+	ca       *CAManager
 }
 
-func New(port int) *Proxy {
-	return &Proxy{
+func New(port int, store *storage.Storage) *Proxy {
+	p := &Proxy{
 		port:    port,
 		traffic: make([]TrafficEntry, 0, 1000),
+		store:   store,
 	}
+
+	// Init CA for MITM
+	ca, err := NewCAManager(filepath.Join(".", ".parallax"))
+	if err != nil {
+		log.Printf("[proxy] Warning: Failed to init CA: %v", err)
+	} else {
+		p.ca = ca
+	}
+
+	return p
 }
 
 func (p *Proxy) OnTraffic(fn func(TrafficEntry)) {
@@ -70,6 +87,7 @@ func (p *Proxy) ClearTraffic() {
 
 func (p *Proxy) Start() error {
 	mux := http.NewServeMux()
+	mux.HandleFunc("/parallax/ca.crt", p.handleCADownload)
 	mux.HandleFunc("/", p.handleHTTP)
 
 	p.server = &http.Server{
@@ -174,6 +192,25 @@ func (p *Proxy) handleHTTP(w http.ResponseWriter, r *http.Request) {
 	if p.onTraffic != nil {
 		p.onTraffic(entry)
 	}
+
+	if p.store != nil {
+		p.store.SaveTraffic(
+			entry.ID, entry.Timestamp, entry.Method, entry.URL,
+			entry.StatusCode, entry.LatencyMs, entry.ContentType, entry.Preview,
+		)
+	}
+}
+
+func (p *Proxy) handleCADownload(w http.ResponseWriter, r *http.Request) {
+	certPath := filepath.Join(".", ".parallax", "ca.crt")
+	data, err := os.ReadFile(certPath)
+	if err != nil {
+		http.Error(w, "CA Cert not found", 404)
+		return
+	}
+	w.Header().Set("Content-Type", "application/x-x509-ca-cert")
+	w.Header().Set("Content-Disposition", "attachment; filename=parallax-ca.crt")
+	w.Write(data)
 }
 
 func (p *Proxy) handleTunnel(w http.ResponseWriter, r *http.Request) {
@@ -181,6 +218,38 @@ func (p *Proxy) handleTunnel(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusServiceUnavailable)
 		return
+	}
+
+	entry := TrafficEntry{
+		ID:               fmt.Sprintf("tunnel-%d", p.counter.Add(1)),
+		Timestamp:        time.Now().UnixMilli(),
+		Method:           "CONNECT",
+		URL:              r.Host,
+		RequestHeaders:   make(map[string]string),
+		StatusCode:       http.StatusOK,
+		LatencyMs:        0,
+		RequestBodySize:  0,
+		ResponseBodySize: 0,
+		ContentType:      "tunnel/tcp",
+		Preview:          fmt.Sprintf("Tunnel established to %s", r.Host),
+	}
+
+	p.mu.Lock()
+	if len(p.traffic) >= 5000 {
+		p.traffic = p.traffic[1:]
+	}
+	p.traffic = append(p.traffic, entry)
+	p.mu.Unlock()
+
+	if p.onTraffic != nil {
+		p.onTraffic(entry)
+	}
+
+	if p.store != nil {
+		p.store.SaveTraffic(
+			entry.ID, entry.Timestamp, entry.Method, entry.URL,
+			entry.StatusCode, entry.LatencyMs, entry.ContentType, entry.Preview,
+		)
 	}
 
 	w.WriteHeader(http.StatusOK)

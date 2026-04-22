@@ -6,8 +6,11 @@ import (
 	"net"
 
 	"github.com/bluephoenix/parallax-worker/health"
+	"github.com/bluephoenix/parallax-worker/loadtest"
+	"github.com/bluephoenix/parallax-worker/mock"
 	"github.com/bluephoenix/parallax-worker/proxy"
 	pb "github.com/bluephoenix/parallax-worker/proto"
+	"github.com/bluephoenix/parallax-worker/watcher"
 	"google.golang.org/grpc"
 )
 
@@ -15,17 +18,26 @@ type Server struct {
 	pb.UnimplementedWorkerServiceServer
 	pb.UnimplementedProxyServiceServer
 	pb.UnimplementedHealthServiceServer
+	pb.UnimplementedLoadTestServiceServer
+	pb.UnimplementedMockServiceServer
+	pb.UnimplementedWatcherServiceServer
 
-	grpcServer *grpc.Server
-	proxySvc   *proxy.Proxy
-	healthSvc  *health.Monitor
+	grpcServer  *grpc.Server
+	proxySvc    *proxy.Proxy
+	healthSvc   *health.Monitor
+	loadtestSvc *loadtest.Service
+	mockSvc     *mock.Server
+	watcherSvc  *watcher.Watcher
 }
 
-func NewServer(watcherSvc any, loadtestSvc any, healthSvc *health.Monitor, proxySvc *proxy.Proxy) *Server {
+func NewServer(watcherSvc *watcher.Watcher, loadtestSvc *loadtest.Service, healthSvc *health.Monitor, proxySvc *proxy.Proxy, mockSvc *mock.Server) *Server {
 	return &Server{
-		grpcServer: grpc.NewServer(),
-		proxySvc:   proxySvc,
-		healthSvc:  healthSvc,
+		grpcServer:  grpc.NewServer(),
+		proxySvc:    proxySvc,
+		healthSvc:   healthSvc,
+		loadtestSvc: loadtestSvc,
+		mockSvc:     mockSvc,
+		watcherSvc:  watcherSvc,
 	}
 }
 
@@ -33,6 +45,9 @@ func (s *Server) Serve(lis net.Listener) error {
 	pb.RegisterWorkerServiceServer(s.grpcServer, s)
 	pb.RegisterProxyServiceServer(s.grpcServer, s)
 	pb.RegisterHealthServiceServer(s.grpcServer, s)
+	pb.RegisterLoadTestServiceServer(s.grpcServer, s)
+	pb.RegisterMockServiceServer(s.grpcServer, s)
+	pb.RegisterWatcherServiceServer(s.grpcServer, s)
 	return s.grpcServer.Serve(lis)
 }
 
@@ -190,4 +205,136 @@ func (s *Server) WatchStatuses(req *pb.GenericRequest, stream pb.HealthService_W
 			}
 		}
 	}
+}
+
+// -----------------------------------------------------------------------------
+// LoadTestService
+// -----------------------------------------------------------------------------
+func (s *Server) RunLoadTest(req *pb.LoadTestConfig, stream pb.LoadTestService_RunLoadTestServer) error {
+	progressCh := make(chan loadtest.ProgressEvent, 100)
+	
+	cfg := loadtest.Config{
+		URL:         req.Url,
+		Method:      req.Method,
+		Headers:     req.Headers,
+		Body:        req.Body,
+		Concurrent:  int(req.Concurrent),
+		TotalReqs:   int(req.TotalRequests),
+		DurationSec: int(req.DurationSec),
+	}
+
+	var result *loadtest.Result
+	var runErr error
+	done := make(chan bool)
+
+	go func() {
+		result, runErr = s.loadtestSvc.Run(cfg, progressCh)
+		close(done)
+	}()
+
+	for {
+		select {
+		case <-stream.Context().Done():
+			s.loadtestSvc.Stop()
+			return nil
+		case p, ok := <-progressCh:
+			if !ok {
+				continue
+			}
+			err := stream.Send(&pb.LoadTestProgress{
+				Completed:  p.Completed,
+				Total:      p.Total,
+				CurrentRps: p.CurrentRPS,
+				Done:       false,
+			})
+			if err != nil {
+				return err
+			}
+		case <-done:
+			if runErr != nil {
+				return runErr
+			}
+			if result == nil {
+				return nil
+			}
+			// Send final result
+			return stream.Send(&pb.LoadTestProgress{
+				Done: true,
+				Result: &pb.LoadTestResult{
+					TotalRequests:  result.TotalRequests,
+					Successful:     result.Successful,
+					Failed:         result.Failed,
+					AvgLatencyMs:   result.AvgLatencyMs,
+					P50LatencyMs:   result.P50LatencyMs,
+					P95LatencyMs:   result.P95LatencyMs,
+					P99LatencyMs:   result.P99LatencyMs,
+					MinLatencyMs:   result.MinLatencyMs,
+					MaxLatencyMs:   result.MaxLatencyMs,
+					ReqsPerSec:     result.ReqsPerSec,
+					Errors:         result.Errors,
+					Histogram:      result.Histogram,
+				},
+			})
+		}
+	}
+}
+
+func (s *Server) StopLoadTest(ctx context.Context, req *pb.StopRequest) (*pb.GenericResponse, error) {
+	s.loadtestSvc.Stop()
+	return &pb.GenericResponse{Success: true}, nil
+}
+
+// -----------------------------------------------------------------------------
+// MockService
+// -----------------------------------------------------------------------------
+func (s *Server) AddRule(ctx context.Context, req *pb.MockRule) (*pb.GenericResponse, error) {
+	s.mockSvc.AddRule(mock.MockRule{
+		ID:          req.Id,
+		Path:        req.Path,
+		Method:      req.Method,
+		StatusCode:  int(req.StatusCode),
+		Body:        req.Body,
+		Headers:     req.Headers,
+		ContentType: req.ContentType,
+	})
+	return &pb.GenericResponse{Success: true}, nil
+}
+
+func (s *Server) RemoveRule(ctx context.Context, req *pb.TargetIDRequest) (*pb.GenericResponse, error) {
+	s.mockSvc.RemoveRule(req.Id)
+	return &pb.GenericResponse{Success: true}, nil
+}
+
+// -----------------------------------------------------------------------------
+// WatcherService
+// -----------------------------------------------------------------------------
+func (s *Server) WatchWorkspace(req *pb.WatchRequest, stream pb.WatcherService_WatchWorkspaceServer) error {
+	ch := make(chan watcher.ChangeEvent, 100)
+	s.watcherSvc.OnChange(func(e watcher.ChangeEvent) {
+		ch <- e
+	})
+	s.watcherSvc.WatchWorkspace(req.WorkspacePath)
+	defer s.watcherSvc.UnwatchWorkspace(req.WorkspacePath)
+
+	for {
+		select {
+		case <-stream.Context().Done():
+			return nil
+		case e := <-ch:
+			err := stream.Send(&pb.FileChangeEvent{
+				Path:          e.Path,
+				Operation:     e.Operation,
+				IsCollection:  e.IsCollection,
+				IsEnvironment: e.IsEnvironment,
+			})
+			if err != nil {
+				return err
+			}
+		}
+	}
+}
+
+func (s *Server) UnwatchWorkspace(ctx context.Context, req *pb.WatchRequest) (*pb.GenericResponse, error) {
+	s.watcherSvc.UnwatchWorkspace(req.WorkspacePath)
+	return &pb.GenericResponse{Success: true}, nil
 }

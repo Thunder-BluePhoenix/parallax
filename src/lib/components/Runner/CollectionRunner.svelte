@@ -15,6 +15,13 @@
   import { resolveRequestTemplates } from "../../utils/template-tags";
   import { runPreRequestScript, runTestScript } from "../../utils/pm-script-runner";
   import type { CollectionRequest, ResponseState, TestResult } from "../../stores/app.svelte";
+  import { open as openDialog } from "@tauri-apps/plugin-dialog";
+  import { readTextFile } from "@tauri-apps/plugin-fs";
+  import Papa from "papaparse";
+  import Handlebars from "handlebars";
+  import { runnerReportTemplate } from "../../utils/runner-report";
+  import { save } from "@tauri-apps/plugin-dialog";
+  import { writeTextFile } from "@tauri-apps/plugin-fs";
 
   let { onClose } = $props<{ onClose: () => void }>();
 
@@ -24,6 +31,11 @@
   let delayMs              = $state(0);
   let stopOnFailure        = $state(false);
   const uuid = () => Math.random().toString(36).substring(2) + Date.now().toString(36);
+
+  // Data file state
+  let dataFileName = $state("");
+  let dataRows     = $state<any[]>([]);
+  let useDataFile  = $state(false);
 
   // Runner state
   let isRunning  = $state(false);
@@ -38,6 +50,38 @@
     tests: TestResult[];
     error: string | null;
   }[]>([]);
+  async function selectDataFile() {
+    try {
+      const selected = await openDialog({
+        multiple: false,
+        filters: [{ name: "Data Files", extensions: ["csv", "json"] }]
+      });
+      if (selected) {
+        const content = await readTextFile(selected as string);
+        dataFileName = (selected as string).split("/").pop() || "";
+        
+        if (dataFileName.endsWith(".json")) {
+          dataRows = JSON.parse(content);
+          if (!Array.isArray(dataRows)) dataRows = [dataRows];
+        } else {
+          const results = Papa.parse(content, { header: true, skipEmptyLines: true });
+          dataRows = results.data;
+        }
+        
+        useDataFile = true;
+        iterations = dataRows.length;
+      }
+    } catch (e) {
+      console.error("Failed to load data file:", e);
+      alert("Error loading data file: " + e);
+    }
+  }
+
+  function clearDataFile() {
+    dataFileName = "";
+    dataRows = [];
+    useDataFile = false;
+  }
 
   async function startRun() {
     if (!selectedCollectionId) return;
@@ -66,13 +110,17 @@
     const startT0 = Date.now();
 
     // The execution loop
-    for (let iter = 0; iter < iterations; iter++) {
-      if (iterations > 1) {
+    const runIterations = useDataFile ? dataRows.length : iterations;
+
+    for (let iter = 0; iter < runIterations; iter++) {
+      if (runIterations > 1) {
         runFeed.push({
-          id: `iter-${iter}`, reqName: `Iteration ${iter + 1}`,
+          id: `iter-${iter}`, reqName: `Iteration ${iter + 1}${useDataFile ? ' (Data Row)' : ''}`,
           method: "INFO", status: 0, timeMs: 0, tests: [], error: null
         });
       }
+
+      const dataVarScope = useDataFile ? dataRows[iter] : {};
 
       for (const req of targetRequests) {
         if (!isRunning) break;
@@ -89,6 +137,7 @@
             ...globalVariables.variables,
             ...collectionVariables.variables,
             ...activeEnvironment.variables,
+            ...dataVarScope, // Data variables have highest priority
           };
 
           // Load scripts for this request
@@ -151,6 +200,7 @@
             },
             timing:    { totalMs: result.timing?.total_ms ?? (Date.now() - t0) },
             sizeBytes: result.size_bytes ?? 0,
+            cookies:   result.cookies ?? [],
           };
 
           // Test scripts
@@ -204,6 +254,41 @@
   function stopRun() {
     isRunning = false;
   }
+
+  async function exportReport(format: "html" | "json") {
+    try {
+      const defaultPath = `parallax-run-${Date.now()}.${format}`;
+      const selected = await save({
+        defaultPath,
+        filters: [{ name: format.toUpperCase() + " Report", extensions: [format] }]
+      });
+
+      if (selected) {
+        let content = "";
+        if (format === "json") {
+          content = JSON.stringify({
+            collection: selectedCollectionId,
+            stats: runStats,
+            feed: runFeed,
+            timestamp: new Date().toISOString(),
+          }, null, 2);
+        } else {
+          const template = Handlebars.compile(runnerReportTemplate);
+          content = template({
+            collectionName: selectedCollectionId,
+            folderName: selectedFolderId || "Full Collection",
+            stats: runStats,
+            requests: runFeed.filter(r => r.method !== "INFO"),
+            timestamp: new Date().toLocaleString(),
+          });
+        }
+        await writeTextFile(selected, content);
+      }
+    } catch (e) {
+      console.error("Export failed:", e);
+      alert("Failed to export report: " + e);
+    }
+  }
 </script>
 
 <div class="runner-container">
@@ -256,6 +341,21 @@
         <label for="stopOnFail">Stop run if an error occurs</label>
       </div>
 
+      <div class="config-divider"></div>
+
+      <div class="config-group">
+        <label>Data File (CSV/JSON)</label>
+        {#if !dataFileName}
+          <button class="btn-secondary" onclick={selectDataFile}>Select File</button>
+        {:else}
+          <div class="data-file-info">
+            <span class="file-name" title={dataFileName}>{dataFileName}</span>
+            <span class="row-count">{dataRows.length} rows</span>
+            <button class="btn-icon-sm" onclick={clearDataFile} title="Clear file">×</button>
+          </div>
+        {/if}
+      </div>
+
       <div class="config-actions">
         {#if isRunning}
           <button class="btn-stop" onclick={stopRun}>Stop Run</button>
@@ -281,6 +381,12 @@
           <span class="stat-value">{runStats.timeMs}ms</span>
           <span class="stat-label">Duration</span>
         </div>
+        {#if isFinished}
+          <div class="summary-actions">
+            <button class="btn-secondary" onclick={() => exportReport("html")}>HTML Report</button>
+            <button class="btn-secondary" onclick={() => exportReport("json")}>JSON Export</button>
+          </div>
+        {/if}
       </div>
 
       <div class="feed-scroll scroll-y">
@@ -382,6 +488,29 @@
     margin-top: 8px;
   }
 
+  .config-divider { height: 1px; background: var(--border-subtle); margin: 4px 0; }
+
+  .data-file-info {
+    display: flex; align-items: center; gap: 8px;
+    padding: 6px 10px; background: var(--bg-elevated); border: 1px solid var(--border-default);
+    border-radius: var(--radius-sm); font-size: 12px;
+  }
+  .file-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 500; }
+  .row-count { color: var(--text-muted); font-size: 11px; }
+
+  .btn-secondary {
+    height: 32px; background: var(--bg-elevated); border: 1px solid var(--border-default);
+    color: var(--text-primary); border-radius: var(--radius-sm); font-size: 12px;
+    transition: var(--transition-fast);
+  }
+  .btn-secondary:hover { border-color: var(--accent-primary); }
+
+  .btn-icon-sm {
+    background: transparent; border: none; color: var(--text-muted); font-size: 16px;
+    cursor: pointer; line-height: 1; padding: 0 4px;
+  }
+  .btn-icon-sm:hover { color: var(--color-error); }
+
   .config-actions { margin-top: auto; padding-top: 20px; }
   .btn-start, .btn-stop {
     width: 100%; height: 36px; border-radius: var(--radius-md); font-weight: 600; font-size: 13px;
@@ -413,6 +542,8 @@
   .stat-label { font-size: 11px; color: var(--text-muted); text-transform: uppercase; }
   .text-success { color: var(--color-success); }
   .text-error { color: var(--color-error); }
+
+  .summary-actions { margin-left: auto; display: flex; gap: 8px; align-items: center; }
 
   .feed-scroll { flex: 1; padding: 12px; }
   .feed-empty { color: var(--text-muted); font-size: 13px; text-align: center; margin-top: 40px; }

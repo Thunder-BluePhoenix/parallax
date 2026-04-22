@@ -19,6 +19,14 @@ pub struct ParallaxRequest {
     pub auth: Option<AuthConfig>,
     pub timeout_ms: Option<u64>,
     pub follow_redirects: Option<bool>,
+    pub scripts: Option<RequestScripts>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RequestScripts {
+    #[serde(rename = "preRequest")]
+    pub pre_request: Option<String>,
+    pub tests: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

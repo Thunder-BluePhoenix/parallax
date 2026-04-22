@@ -138,6 +138,29 @@ message TrafficList {
 }
 
 // =============================================================================
+// Mock Service
+// =============================================================================
+service MockService {
+  rpc AddRule(MockRule) returns (GenericResponse);
+  rpc RemoveRule(TargetIDRequest) returns (GenericResponse);
+  rpc ListRules(GenericRequest) returns (MockRuleList);
+}
+
+message MockRule {
+  string id = 1;
+  string path = 2;
+  string method = 3;
+  int32 status_code = 4;
+  string body = 5;
+  map<string, string> headers = 6;
+  string content_type = 7;
+}
+
+message MockRuleList {
+  repeated MockRule rules = 1;
+}
+
+// =============================================================================
 // Common
 // =============================================================================
 message GenericRequest {}

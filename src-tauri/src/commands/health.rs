@@ -60,7 +60,7 @@ pub async fn start_health_stream(app: AppHandle) -> Result<(), String> {
 }
 
 #[command]
-pub async fn add_health_target(id: String, name: String, url: String, interval_sec: i32, timeout_ms: i32) -> Result<(), String> {
+pub async fn add_health_target(id: String, name: String, url: String, interval_sec: i32, timeout_ms: i32, alert_webhook: String) -> Result<(), String> {
     let channel = Channel::from_static("http://127.0.0.1:50151")
         .timeout(Duration::from_secs(2))
         .connect()
@@ -69,7 +69,7 @@ pub async fn add_health_target(id: String, name: String, url: String, interval_s
 
     let mut client = HealthServiceClient::new(channel);
     client.add_target(tonic::Request::new(ServiceTarget {
-        id, name, url, interval_sec, timeout_ms
+        id, name, url, interval_sec, timeout_ms, alert_webhook
     })).await.map_err(|e| e.to_string())?;
 
     Ok(())

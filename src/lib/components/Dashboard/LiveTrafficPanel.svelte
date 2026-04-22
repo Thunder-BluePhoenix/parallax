@@ -3,6 +3,9 @@
   import { listen } from "@tauri-apps/api/event";
   import { onMount, onDestroy } from "svelte";
   import Logo from "../Common/Logo.svelte";
+  import { loadRequestIntoTab, appMode } from "../../stores/app.svelte";
+  import { save } from "@tauri-apps/plugin-dialog";
+  import { writeTextFile } from "@tauri-apps/plugin-fs";
 
   interface TrafficEvent {
     id: string;
@@ -13,10 +16,23 @@
     latency_ms: number;
     content_type: string;
     preview: string;
+    request_headers?: Record<string, string>;
+    request_body_bytes?: number;
+    response_headers?: Record<string, string>;
+    response_body_bytes?: number;
   }
 
   let traffic = $state<TrafficEvent[]>([]);
+  let searchQuery = $state("");
   let unlisten: () => void;
+
+  let filteredTraffic = $derived(traffic.filter(t => {
+    if (!searchQuery) return true;
+    const q = searchQuery.toLowerCase();
+    return t.url.toLowerCase().includes(q) || 
+           t.method.toLowerCase().includes(q) || 
+           t.status_code.toString().includes(q);
+  }));
 
   async function loadInitial() {
     try {
@@ -59,6 +75,58 @@
     };
     return map[m.toUpperCase()] || "method-get";
   }
+
+  function replayRequest(t: TrafficEvent) {
+    loadRequestIntoTab({
+      id: "replay-" + Date.now(),
+      name: `Replay ${t.method} ${new URL(t.url).pathname || '/'}`,
+      method: t.method,
+      url: t.url,
+      headers: t.request_headers || {},
+      body: (t.request_body_bytes || 0) > 0 ? { type: "raw", content: "/* captured body not fully available */" } : null
+    });
+    appMode.value = "builder";
+  }
+
+  async function exportHAR() {
+    try {
+      const har = {
+        log: {
+          version: "1.2",
+          creator: { name: "Parallax", version: "1.0" },
+          entries: traffic.map(t => ({
+            startedDateTime: new Date(t.timestamp_ms).toISOString(),
+            time: t.latency_ms,
+            request: {
+              method: t.method,
+              url: t.url,
+              httpVersion: "HTTP/1.1",
+              headers: Object.entries(t.request_headers || {}).map(([name, value]) => ({ name, value })),
+              queryString: [], cookies: [], headersSize: -1, bodySize: t.request_body_bytes || 0
+            },
+            response: {
+              status: t.status_code,
+              statusText: "",
+              httpVersion: "HTTP/1.1",
+              headers: Object.entries(t.response_headers || {}).map(([name, value]) => ({ name, value })),
+              cookies: [],
+              content: { size: t.response_body_bytes || 0, mimeType: t.content_type },
+              redirectURL: "", headersSize: -1, bodySize: t.response_body_bytes || 0
+            },
+            cache: {},
+            timings: { send: 0, wait: t.latency_ms, receive: 0 }
+          }))
+        }
+      };
+
+      const path = await save({ defaultPath: `parallax-capture-${Date.now()}.har` });
+      if (path) {
+        await writeTextFile(path, JSON.stringify(har, null, 2));
+      }
+    } catch (e) {
+      console.error("HAR export failed", e);
+    }
+  }
 </script>
 
 <div class="dashboard-section animate-fade-in" style="max-width: 100%;">
@@ -72,6 +140,8 @@
       <Logo size={14} />
       <span>Proxy listening on <span class="mono" style="color:var(--accent-secondary)">127.0.0.1:8888</span></span>
     </div>
+    <input type="text" class="filter-input" placeholder="Filter domain, method, status..." bind:value={searchQuery} />
+    <button class="btn-action" onclick={exportHAR}>Export HAR</button>
     <button class="btn-action" onclick={clearTraffic}>Clear Traffic</button>
   </div>
 
@@ -83,15 +153,16 @@
       <span style="width: 60px">Status</span>
       <span style="width: 70px">Latency</span>
       <span style="flex: 1">Type</span>
+      <span style="width: 60px">Actions</span>
     </div>
     
     <div class="traffic-body scroll-y">
-      {#if traffic.length === 0}
+      {#if filteredTraffic.length === 0}
         <div class="traffic-empty">
           <span class="text-muted">Traffic will appear here once your app sends requests through the proxy</span>
         </div>
       {:else}
-        {#each traffic.slice().reverse() as t (t.id)}
+        {#each filteredTraffic.slice().reverse() as t (t.id)}
           <div class="traffic-row">
             <span class="cell time">{new Date(t.timestamp_ms).toLocaleTimeString([], { hour12: false, fractionalSecondDigits: 3 })}</span>
             <span class="cell method"><span class="method-badge {methodColor(t.method)}">{t.method}</span></span>
@@ -99,6 +170,7 @@
             <span class="cell status" class:status-err={t.status_code >= 400} class:status-ok={t.status_code < 300}>{t.status_code}</span>
             <span class="cell latency">{Math.round(t.latency_ms)}ms</span>
             <span class="cell type">{t.content_type.split(';')[0] || '-'}</span>
+            <span class="cell actions"><button class="btn-replay" onclick={() => replayRequest(t)}>Replay</button></span>
           </div>
         {/each}
       {/if}
@@ -164,4 +236,17 @@
 
   .pulse-dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: var(--text-muted); }
   .pulse-dot.up { background: var(--color-success); animation: pulse-dot 2s infinite; }
+
+  .filter-input {
+    background: var(--bg-elevated); border: 1px solid var(--border-default);
+    color: var(--text-primary); font-size: 12px; border-radius: var(--radius-md);
+    padding: 6px 12px; width: 250px; outline: none;
+  }
+  .filter-input:focus { border-color: var(--accent-primary); }
+
+  .btn-replay {
+    background: none; border: 1px solid var(--border-default); color: var(--text-primary);
+    border-radius: var(--radius-sm); font-size: 10px; cursor: pointer; padding: 2px 6px;
+  }
+  .btn-replay:hover { background: var(--bg-elevated); border-color: var(--accent-primary); color: var(--accent-primary); }
 </style>

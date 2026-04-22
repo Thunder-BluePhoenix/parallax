@@ -2,7 +2,7 @@
 // versions:
 // - protoc-gen-go-grpc v1.6.1
 // - protoc             v7.34.1
-// source: proto/parallax.proto
+// source: parallax.proto
 
 package proto
 
@@ -125,7 +125,7 @@ var WorkerService_ServiceDesc = grpc.ServiceDesc{
 		},
 	},
 	Streams:  []grpc.StreamDesc{},
-	Metadata: "proto/parallax.proto",
+	Metadata: "parallax.proto",
 }
 
 const (
@@ -315,7 +315,7 @@ var LoadTestService_ServiceDesc = grpc.ServiceDesc{
 			ServerStreams: true,
 		},
 	},
-	Metadata: "proto/parallax.proto",
+	Metadata: "parallax.proto",
 }
 
 const (
@@ -543,7 +543,7 @@ var HealthService_ServiceDesc = grpc.ServiceDesc{
 			ServerStreams: true,
 		},
 	},
-	Metadata: "proto/parallax.proto",
+	Metadata: "parallax.proto",
 }
 
 const (
@@ -695,7 +695,7 @@ var WatcherService_ServiceDesc = grpc.ServiceDesc{
 			ServerStreams: true,
 		},
 	},
-	Metadata: "proto/parallax.proto",
+	Metadata: "parallax.proto",
 }
 
 const (
@@ -885,5 +885,191 @@ var ProxyService_ServiceDesc = grpc.ServiceDesc{
 			ServerStreams: true,
 		},
 	},
-	Metadata: "proto/parallax.proto",
+	Metadata: "parallax.proto",
+}
+
+const (
+	MockService_AddRule_FullMethodName    = "/parallax.MockService/AddRule"
+	MockService_RemoveRule_FullMethodName = "/parallax.MockService/RemoveRule"
+	MockService_ListRules_FullMethodName  = "/parallax.MockService/ListRules"
+)
+
+// MockServiceClient is the client API for MockService service.
+//
+// For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
+//
+// =============================================================================
+// Mock Service
+// =============================================================================
+type MockServiceClient interface {
+	AddRule(ctx context.Context, in *MockRule, opts ...grpc.CallOption) (*GenericResponse, error)
+	RemoveRule(ctx context.Context, in *TargetIDRequest, opts ...grpc.CallOption) (*GenericResponse, error)
+	ListRules(ctx context.Context, in *GenericRequest, opts ...grpc.CallOption) (*MockRuleList, error)
+}
+
+type mockServiceClient struct {
+	cc grpc.ClientConnInterface
+}
+
+func NewMockServiceClient(cc grpc.ClientConnInterface) MockServiceClient {
+	return &mockServiceClient{cc}
+}
+
+func (c *mockServiceClient) AddRule(ctx context.Context, in *MockRule, opts ...grpc.CallOption) (*GenericResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GenericResponse)
+	err := c.cc.Invoke(ctx, MockService_AddRule_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *mockServiceClient) RemoveRule(ctx context.Context, in *TargetIDRequest, opts ...grpc.CallOption) (*GenericResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GenericResponse)
+	err := c.cc.Invoke(ctx, MockService_RemoveRule_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *mockServiceClient) ListRules(ctx context.Context, in *GenericRequest, opts ...grpc.CallOption) (*MockRuleList, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(MockRuleList)
+	err := c.cc.Invoke(ctx, MockService_ListRules_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// MockServiceServer is the server API for MockService service.
+// All implementations must embed UnimplementedMockServiceServer
+// for forward compatibility.
+//
+// =============================================================================
+// Mock Service
+// =============================================================================
+type MockServiceServer interface {
+	AddRule(context.Context, *MockRule) (*GenericResponse, error)
+	RemoveRule(context.Context, *TargetIDRequest) (*GenericResponse, error)
+	ListRules(context.Context, *GenericRequest) (*MockRuleList, error)
+	mustEmbedUnimplementedMockServiceServer()
+}
+
+// UnimplementedMockServiceServer must be embedded to have
+// forward compatible implementations.
+//
+// NOTE: this should be embedded by value instead of pointer to avoid a nil
+// pointer dereference when methods are called.
+type UnimplementedMockServiceServer struct{}
+
+func (UnimplementedMockServiceServer) AddRule(context.Context, *MockRule) (*GenericResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method AddRule not implemented")
+}
+func (UnimplementedMockServiceServer) RemoveRule(context.Context, *TargetIDRequest) (*GenericResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method RemoveRule not implemented")
+}
+func (UnimplementedMockServiceServer) ListRules(context.Context, *GenericRequest) (*MockRuleList, error) {
+	return nil, status.Error(codes.Unimplemented, "method ListRules not implemented")
+}
+func (UnimplementedMockServiceServer) mustEmbedUnimplementedMockServiceServer() {}
+func (UnimplementedMockServiceServer) testEmbeddedByValue()                     {}
+
+// UnsafeMockServiceServer may be embedded to opt out of forward compatibility for this service.
+// Use of this interface is not recommended, as added methods to MockServiceServer will
+// result in compilation errors.
+type UnsafeMockServiceServer interface {
+	mustEmbedUnimplementedMockServiceServer()
+}
+
+func RegisterMockServiceServer(s grpc.ServiceRegistrar, srv MockServiceServer) {
+	// If the following call panics, it indicates UnimplementedMockServiceServer was
+	// embedded by pointer and is nil.  This will cause panics if an
+	// unimplemented method is ever invoked, so we test this at initialization
+	// time to prevent it from happening at runtime later due to I/O.
+	if t, ok := srv.(interface{ testEmbeddedByValue() }); ok {
+		t.testEmbeddedByValue()
+	}
+	s.RegisterService(&MockService_ServiceDesc, srv)
+}
+
+func _MockService_AddRule_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(MockRule)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(MockServiceServer).AddRule(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: MockService_AddRule_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(MockServiceServer).AddRule(ctx, req.(*MockRule))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _MockService_RemoveRule_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(TargetIDRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(MockServiceServer).RemoveRule(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: MockService_RemoveRule_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(MockServiceServer).RemoveRule(ctx, req.(*TargetIDRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _MockService_ListRules_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GenericRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(MockServiceServer).ListRules(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: MockService_ListRules_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(MockServiceServer).ListRules(ctx, req.(*GenericRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+// MockService_ServiceDesc is the grpc.ServiceDesc for MockService service.
+// It's only intended for direct use with grpc.RegisterService,
+// and not to be introspected or modified (even as a copy)
+var MockService_ServiceDesc = grpc.ServiceDesc{
+	ServiceName: "parallax.MockService",
+	HandlerType: (*MockServiceServer)(nil),
+	Methods: []grpc.MethodDesc{
+		{
+			MethodName: "AddRule",
+			Handler:    _MockService_AddRule_Handler,
+		},
+		{
+			MethodName: "RemoveRule",
+			Handler:    _MockService_RemoveRule_Handler,
+		},
+		{
+			MethodName: "ListRules",
+			Handler:    _MockService_ListRules_Handler,
+		},
+	},
+	Streams:  []grpc.StreamDesc{},
+	Metadata: "parallax.proto",
 }

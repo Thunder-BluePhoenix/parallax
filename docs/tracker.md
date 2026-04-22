@@ -7,8 +7,8 @@ Last updated: 2026-04-23
 ## Overall Progress
 
 ```
-Phase 1    ███████████████████░  97%  🔄 Near Complete
-Phase 2    ████░░░░░░░░░░░░░░░░  20%  🔄 In Progress (Dashboard stub + Proxy + Health wired)
+Phase 1    ███████████████████░  97%  🔄 Near Complete (HTTP/3 + gRPC calls remain)
+Phase 2    █████████████░░░░░░░  65%  🔄 In Progress (proxy/health/loadtest done; CLI + filter + SQLite + mock full remain)
 Phase 2.5  ░░░░░░░░░░░░░░░░░░░░   0%  🔲 Planned (Git Collaboration + Chat)
 Phase 3    ░░░░░░░░░░░░░░░░░░░░   0%  🔲 Planned
 Phase 4    ░░░░░░░░░░░░░░░░░░░░   0%  🔲 Planned
@@ -208,11 +208,11 @@ Phase 5    ░░░░░░░░░░░░░░░░░░░░   0%  �
 | Iteration count | ✅ Done | |
 | Delay between requests | ✅ Done | |
 | Stop on first failure toggle | ✅ Done | |
-| Data file (CSV/JSON) for data-driven runs | 🔲 | |
+| Data file (CSV/JSON) for data-driven runs | ✅ Done | UI file picker + CSV/JSON loader in `CollectionRunner.svelte` |
 | Variable chaining between requests in run | ✅ Done | `pm.environment.set()` in scripts persists |
 | Live run feed UI | ✅ Done | Per-request pass/fail rows |
 | Summary panel (passed/failed/time) | ✅ Done | |
-| Report output (JSON + HTML) | 🔲 | |
+| Report output (JSON + HTML) | ✅ Done | `runner-report.ts` — HTML template; saved to `.parallax/reports/` |
 
 ### `parallax-cli` (Newman equivalent, Go)
 | Task | Status | Notes |
@@ -225,16 +225,16 @@ Phase 5    ░░░░░░░░░░░░░░░░░░░░   0%  �
 | Dashboard Mode UI shell | ✅ Done | `DashboardMode.svelte` |
 | Live Traffic Stream panel | ✅ Done | `LiveTrafficPanel.svelte` — streams from proxy gRPC |
 | Health Heatmap panel | ✅ Done | `HealthHeatmapPanel.svelte` — streams from health gRPC |
-| Load Test Results panel | 🔲 | |
-| Git Sync Status panel | 🔲 | |
+| Load Test Results panel | ✅ Done | `LoadTestPanel.svelte` — RPS chart + latency histogram |
+| Git Sync Status panel | 🔲 | Phase 2.5 |
 | Collection Run History panel | 🔲 | |
 
 ### Go Local Proxy (Rust commands wired to gRPC)
 | Task | Status | Notes |
 |---|---|---|
 | `start_proxy_stream` / `get_proxy_traffic` / `clear_proxy_traffic` | ✅ Done | Rust ↔ gRPC wired |
-| HTTP proxy server in Go (`localhost:8765`) | 🔲 | Go-side not yet implemented |
-| HTTPS MITM with local CA cert | 🔲 | |
+| HTTP proxy server in Go (`localhost:8765`) | ✅ Done | `src-go/proxy/proxy.go` (274 lines) — real HTTP/HTTPS intercept |
+| HTTPS MITM with local CA cert | ✅ Done | `src-go/proxy/ca.go` (99 lines) — CA cert generation |
 | Traffic filter by domain/method/status | 🔲 | |
 | Export as HAR | 🔲 | |
 | Replay captured request | 🔲 | |
@@ -243,7 +243,7 @@ Phase 5    ░░░░░░░░░░░░░░░░░░░░   0%  �
 | Task | Status | Notes |
 |---|---|---|
 | `start_health_stream` / `add/remove_health_target` / `get_health_statuses` | ✅ Done | Rust ↔ gRPC wired |
-| Goroutine-per-service health checks in Go | 🔲 | Go-side not yet implemented |
+| Goroutine-per-service health checks in Go | ✅ Done | `src-go/health/health.go` (180 lines) — goroutine-per-service |
 | SQLite uptime history | 🔲 | |
 | Desktop notifications on status change | 🔲 | |
 | Alert webhook on failure | 🔲 | |
@@ -251,7 +251,10 @@ Phase 5    ░░░░░░░░░░░░░░░░░░░░   0%  �
 ### Load Tester
 | Task | Status | Notes |
 |---|---|---|
-| All load test features | 🔲 | |
+| Go concurrent engine | ✅ Done | Histogram + RPS calc |
+| Rust gRPC bridge | ✅ Done | `run_load_test` command |
+| UI Panel | ✅ Done | `LoadTestPanel.svelte` with histogram |
+| StreamLoadTest stream | ✅ Done | |
 
 ### Response Visualization (Postman Visualizer)
 | Task | Status | Notes |
@@ -264,15 +267,20 @@ Phase 5    ░░░░░░░░░░░░░░░░░░░░   0%  �
 ### Mock Server
 | Task | Status | Notes |
 |---|---|---|
-| All mock server features | 🔲 | |
+| Go mock server — start/stop + AddRule/RemoveRule | ✅ Done | `src-go/mock/mock.go` (86 lines); Rust commands in `mock.rs` |
+| Path parameters (`:id`) and wildcards | 🔲 | |
+| Response templating with request data | 🔲 | |
+| Configurable response delay | 🔲 | |
+| Record mode (proxy + auto-generate rules) | 🔲 | |
+| `parallax-cli mock` command | 🔲 | |
 
 ### gRPC Streaming Bridge
 | Task | Status | Notes |
 |---|---|---|
 | `WatchTraffic` stream | ✅ Done | Rust command → gRPC |
-| `WatchHealth` stream | ✅ Done | Rust command → gRPC |
+| `WatchHealth` stream (`WatchStatuses`) | ✅ Done | Rust command → gRPC |
+| `StreamLoadTest` (`RunLoadTest`) stream | ✅ Done | `grpc/server.go` line 208 |
 | `WatchFiles` stream | 🔲 | |
-| `StreamLoadTest` stream | 🔲 | |
 | `StreamRunner` stream | 🔲 | |
 
 ---
@@ -482,9 +490,12 @@ Phase 5    ░░░░░░░░░░░░░░░░░░░░   0%  �
 | Blocker | Impact | Priority |
 |---|---|---|
 | ~~Cookie manager UI missing~~ | ~~Cookies work in reqwest but not inspectable~~ | ✅ Resolved |
-| Go-side proxy HTTP server not implemented | `LiveTrafficPanel` Rust commands exist but Go not wired | 🟡 P1 |
-| Go-side health goroutines not implemented | `HealthHeatmapPanel` Rust commands exist but Go not wired | 🟡 P1 |
+| ~~Go-side proxy HTTP server not implemented~~ | ~~`LiveTrafficPanel` Rust commands exist but Go not wired~~ | ✅ Resolved — `proxy.go` + `ca.go` implemented |
+| ~~Go-side health goroutines not implemented~~ | ~~`HealthHeatmapPanel` Rust commands exist but Go not wired~~ | ✅ Resolved — `health.go` goroutines implemented |
 | ~~GraphQL schema introspection missing~~ | ~~GraphQL body works; no schema browser~~ | ✅ Resolved |
+| `parallax-cli` not started | No Newman equivalent for CI/CD pipelines | 🟡 P1 |
+| Go runner missing template engine + test scripts | CLI runner executes requests but can't resolve `{{vars}}` or run `pm.test()` | 🟡 P1 |
+| Mock server path params + templating not implemented | Basic rules only; `:id` routes don't work | 🟢 P2 |
 | Sidebar drag-and-drop reordering | Collections are static order | 🟢 P2 |
 
 ---

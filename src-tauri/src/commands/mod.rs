@@ -9,3 +9,5 @@ pub mod websocket;
 pub mod sse;
 pub mod proxy;
 pub mod health;
+pub mod loadtest;
+pub mod mock;

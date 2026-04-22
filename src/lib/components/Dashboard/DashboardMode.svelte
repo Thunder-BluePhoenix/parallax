@@ -5,6 +5,7 @@
   import Logo from "../Common/Logo.svelte";
   import HealthHeatmapPanel from "./HealthHeatmapPanel.svelte";
   import LiveTrafficPanel from "./LiveTrafficPanel.svelte";
+  import LoadTestPanel from "./LoadTestPanel.svelte";
 
   // Schema Explorer state
   let explorerPath = $state("");
@@ -16,15 +17,19 @@
     return fn ? (fn as any)(cmd, args) : Promise.reject("Tauri invoke not found");
   };
 
-  let activeSection = $state<"health" | "loadtest" | "proxy" | "ecosystem">("health");
+  let activeSection = $state<"health" | "loadtest" | "proxy" | "history" | "ecosystem">("health");
   let workerConnected = $state(false);
 
   const sections = [
     { id: "health", label: "Health Monitor", icon: "❤" },
     { id: "loadtest", label: "Load Test", icon: "⚡" },
     { id: "proxy", label: "Traffic", icon: "🔀" },
+    { id: "history", label: "Run History", icon: "🕒" },
     { id: "ecosystem", label: "Ecosystem", icon: "🔌" },
   ] as const;
+
+  // Run history stats
+  import { responseHistory } from "../../stores/app.svelte";
 
   async function checkWorkerStatus() {
     try {
@@ -67,6 +72,22 @@
 
   onMount(() => {
     checkWorkerStatus();
+    
+    // Start background streams
+    invoke("start_health_stream").catch(console.error);
+    invoke("start_proxy_stream").catch(console.error);
+
+    // Add some default health targets for the demo
+    const defaultTargets = [
+      { id: "google", name: "Google.com", url: "https://www.google.com", interval_sec: 10, timeout_ms: 2000 },
+      { id: "github", name: "GitHub", url: "https://github.com", interval_sec: 30, timeout_ms: 3000 },
+      { id: "localhost", name: "Local Dev", url: "http://localhost:1420", interval_sec: 5, timeout_ms: 1000 },
+    ];
+
+    defaultTargets.forEach(t => {
+      invoke("add_health_target", t).catch(console.error);
+    });
+
     const interval = setInterval(checkWorkerStatus, 5000);
     return () => clearInterval(interval);
   });
@@ -109,70 +130,39 @@
       <HealthHeatmapPanel />
 
     {:else if activeSection === "loadtest"}
-      <div class="dashboard-section animate-fade-in">
-        <div class="section-header">
-          <h2>Load Test</h2>
-          <p class="section-desc">Stress test your APIs with Go's concurrent goroutines</p>
-        </div>
-
-        <div class="loadtest-config">
-          <div class="config-row">
-            <div class="config-field">
-              <label for="lt-url">URL</label>
-              <input id="lt-url" type="text" placeholder="https://api.example.com/endpoint" class="form-input" />
-            </div>
-            <div class="config-field small">
-              <label for="lt-method">Method</label>
-              <select id="lt-method" class="form-select">
-                <option>GET</option><option>POST</option><option>PUT</option>
-              </select>
-            </div>
-          </div>
-
-          <div class="config-row">
-            <div class="config-field small">
-              <label for="lt-users">Concurrent Users</label>
-              <input id="lt-users" type="number" value="50" min="1" max="1000" class="form-input" />
-            </div>
-            <div class="config-field small">
-              <label for="lt-total">Total Requests</label>
-              <input id="lt-total" type="number" value="500" class="form-input" />
-            </div>
-            <div class="config-field small">
-              <label for="lt-duration">Duration (sec, 0 = use count)</label>
-              <input id="lt-duration" type="number" value="0" class="form-input" />
-            </div>
-          </div>
-
-          <button class="btn-action danger">▶ Start Load Test</button>
-        </div>
-
-        <!-- Results placeholder -->
-        <div class="loadtest-results">
-          <div class="stat-grid">
-            {#each [
-              { label: "Req/sec", value: "—" },
-              { label: "P50 Latency", value: "—" },
-              { label: "P95 Latency", value: "—" },
-              { label: "P99 Latency", value: "—" },
-              { label: "Success", value: "—" },
-              { label: "Errors", value: "—" },
-            ] as stat}
-              <div class="stat-card">
-                <span class="stat-label">{stat.label}</span>
-                <span class="stat-value">{stat.value}</span>
-              </div>
-            {/each}
-          </div>
-
-          <div class="histogram-placeholder">
-            <span class="text-muted">Latency histogram will appear here after a test run</span>
-          </div>
-        </div>
-      </div>
+      <LoadTestPanel />
 
     {:else if activeSection === "proxy"}
       <LiveTrafficPanel />
+
+    {:else if activeSection === "history"}
+      <div class="dashboard-section animate-fade-in">
+        <div class="section-header">
+          <h2>Collection Run History</h2>
+          <p class="section-desc">View recent test execution history and exports</p>
+        </div>
+        <div class="history-grid">
+          {#if responseHistory.length === 0}
+            <div class="traffic-empty">
+              <span class="text-muted">No runs have been executed yet.</span>
+            </div>
+          {:else}
+            {#each responseHistory.slice(0, 50) as entry (entry.id)}
+              <div class="history-card">
+                <div class="history-card-header">
+                  <div style="font-weight: 600; font-size: 13px;">{entry.requestName}</div>
+                  <div class="text-muted mono" style="font-size: 10px;">{new Date(entry.timestamp).toLocaleString()}</div>
+                </div>
+                <div style="display:flex; gap: 8px; font-size: 11px; margin-top: 8px;">
+                  <span class="status-badge" class:ok={entry.status < 400} class:err={entry.status >= 400}>{entry.status}</span>
+                  <span class="text-muted">{entry.durationMs}ms</span>
+                  <span class="text-muted">{entry.method} {entry.url}</span>
+                </div>
+              </div>
+            {/each}
+          {/if}
+        </div>
+      </div>
 
     {:else if activeSection === "ecosystem"}
       <div class="dashboard-section animate-fade-in">
@@ -517,4 +507,17 @@
     font-size: 10px;
     color: var(--text-muted);
   }
+
+  .history-grid { display: flex; flex-direction: column; gap: 8px; }
+  .history-card {
+    background: var(--bg-surface); border: 1px solid var(--border-default);
+    padding: 12px; border-radius: var(--radius-md);
+  }
+  .history-card-header { display: flex; justify-content: space-between; }
+  .status-badge {
+    padding: 2px 6px; border-radius: 4px; font-weight: 700; font-family: var(--font-mono);
+  }
+  .status-badge.ok { background: rgba(63, 185, 80, 0.2); color: var(--color-success); }
+  .status-badge.err { background: rgba(248, 81, 73, 0.2); color: var(--color-error); }
+  .traffic-empty { padding: 40px; text-align: center; font-size: 12px; }
 </style>

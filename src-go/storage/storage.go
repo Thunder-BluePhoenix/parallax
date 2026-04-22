@@ -56,6 +56,15 @@ func (s *Storage) initSchema() error {
 			content_type TEXT,
 			preview TEXT
 		)`,
+		`CREATE TABLE IF NOT EXISTS mock_rules (
+			id TEXT PRIMARY KEY,
+			path TEXT,
+			method TEXT,
+			status_code INTEGER,
+			body TEXT,
+			headers TEXT,
+			content_type TEXT
+		)`,
 	}
 
 	for _, q := range queries {
@@ -110,6 +119,42 @@ func (s *Storage) GetRecentTraffic(limit int) ([]map[string]interface{}, error) 
 		result = append(result, map[string]interface{}{
 			"id": id, "timestamp_ms": ts, "method": method, "url": url,
 			"status_code": code, "latency_ms": latency, "content_type": ctype, "preview": preview,
+		})
+	}
+	return result, nil
+}
+
+// Mock Rules
+func (s *Storage) SaveMockRule(id, path, method string, code int, body, headers, ctype string) error {
+	_, execErr := s.db.Exec(
+		"INSERT OR REPLACE INTO mock_rules (id, path, method, status_code, body, headers, content_type) VALUES (?, ?, ?, ?, ?, ?, ?)",
+		id, path, method, code, body, headers, ctype,
+	)
+	return execErr
+}
+
+func (s *Storage) DeleteMockRule(id string) error {
+	_, execErr := s.db.Exec("DELETE FROM mock_rules WHERE id = ?", id)
+	return execErr
+}
+
+func (s *Storage) GetAllMockRules() ([]map[string]interface{}, error) {
+	rows, err := s.db.Query("SELECT * FROM mock_rules")
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var result []map[string]interface{}
+	for rows.Next() {
+		var id, path, method, body, headers, ctype string
+		var code int
+		if err := rows.Scan(&id, &path, &method, &code, &body, &headers, &ctype); err != nil {
+			return nil, err
+		}
+		result = append(result, map[string]interface{}{
+			"id": id, "path": path, "method": method, "status_code": code,
+			"body": body, "headers": headers, "content_type": ctype,
 		})
 	}
 	return result, nil

@@ -24,9 +24,21 @@
 
   let traffic = $state<TrafficEvent[]>([]);
   let searchQuery = $state("");
+  let filterMethod = $state<string>("ALL");
+  let filterStatus = $state<string>("ALL");
   let unlisten: () => void;
 
   let filteredTraffic = $derived(traffic.filter(t => {
+    // Method filter
+    if (filterMethod !== "ALL" && t.method !== filterMethod) return false;
+    
+    // Status filter
+    if (filterStatus !== "ALL") {
+      if (filterStatus === "2xx" && (t.status_code < 200 || t.status_code >= 300)) return false;
+      if (filterStatus === "4xx" && (t.status_code < 400 || t.status_code >= 500)) return false;
+      if (filterStatus === "5xx" && t.status_code < 500) return false;
+    }
+
     if (!searchQuery) return true;
     const q = searchQuery.toLowerCase();
     return t.url.toLowerCase().includes(q) || 
@@ -140,7 +152,23 @@
       <Logo size={14} />
       <span>Proxy listening on <span class="mono" style="color:var(--accent-secondary)">127.0.0.1:8888</span></span>
     </div>
-    <input type="text" class="filter-input" placeholder="Filter domain, method, status..." bind:value={searchQuery} />
+    <div class="filter-group">
+      <select bind:value={filterMethod} class="filter-select">
+        <option value="ALL">All Methods</option>
+        <option>GET</option>
+        <option>POST</option>
+        <option>PUT</option>
+        <option>DELETE</option>
+      </select>
+      
+      <select bind:value={filterStatus} class="filter-select">
+        <option value="ALL">All Status</option>
+        <option value="2xx">Success (2xx)</option>
+        <option value="4xx">Client Error (4xx)</option>
+        <option value="5xx">Server Error (5xx)</option>
+      </select>
+    </div>
+    <input type="text" class="filter-input" placeholder="Filter domain..." bind:value={searchQuery} />
     <button class="btn-action" onclick={exportHAR}>Export HAR</button>
     <button class="btn-action" onclick={clearTraffic}>Clear Traffic</button>
   </div>
@@ -240,9 +268,17 @@
   .filter-input {
     background: var(--bg-elevated); border: 1px solid var(--border-default);
     color: var(--text-primary); font-size: 12px; border-radius: var(--radius-md);
-    padding: 6px 12px; width: 250px; outline: none;
+    padding: 6px 12px; width: 200px; outline: none;
   }
   .filter-input:focus { border-color: var(--accent-primary); }
+
+  .filter-group { display: flex; gap: 8px; }
+  .filter-select {
+    height: 30px; padding: 0 8px; background: var(--bg-elevated); border: 1px solid var(--border-default);
+    border-radius: var(--radius-md); color: var(--text-secondary); font-size: 11px; cursor: pointer;
+    outline: none;
+  }
+  .filter-select:focus { border-color: var(--accent-primary); }
 
   .btn-replay {
     background: none; border: 1px solid var(--border-default); color: var(--text-primary);

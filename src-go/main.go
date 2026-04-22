@@ -23,6 +23,7 @@ import (
 	"github.com/bluephoenix/parallax-worker/runner"
 	"path/filepath"
 	"gopkg.in/yaml.v3"
+	"time"
 )
 
 var (
@@ -42,6 +43,9 @@ func main() {
 			return
 		case "mock":
 			handleCLIMock(os.Args[2:])
+			return
+		case "init":
+			handleCLIInit(os.Args[2:])
 			return
 		}
 	}
@@ -71,7 +75,7 @@ func main() {
 	loadtestSvc := loadtest.New()
 	healthSvc := health.New(store)
 	proxySvc := proxy.New(*proxyPort, store)
-	mockSvc := mock.New(*mockPort)
+	mockSvc := mock.New(*mockPort, store)
 
 	// Start gRPC server
 	grpcServer := grpcworker.NewServer(watcherSvc, loadtestSvc, healthSvc, proxySvc, mockSvc)
@@ -111,19 +115,18 @@ func main() {
 }
 
 func handleCLIRun(args []string) {
-	if len(args) < 1 {
-		fmt.Println("Usage: parallax run <collection.yaml> [-e <environment.json>]")
+	fs := flag.NewFlagSet("run", flag.ExitOnError)
+	envPath := fs.String("e", "", "Environment file path")
+	iterations := fs.Int("i", 1, "Number of iterations")
+	delay := fs.Int("d", 0, "Delay between requests in ms")
+	fs.Parse(args)
+
+	if fs.NArg() < 1 {
+		fmt.Println("Usage: parallax run <collection.yaml> [-e <environment.json>] [-i <iterations>] [-d <delay_ms>]")
 		os.Exit(1)
 	}
 
-	colPath := args[0]
-	envPath := ""
-	for i := 1; i < len(args); i++ {
-		if args[i] == "-e" && i+1 < len(args) {
-			envPath = args[i+1]
-			break
-		}
-	}
+	colPath := fs.Arg(0)
 
 	// Load collection
 	colData, err := os.ReadFile(colPath)
@@ -140,30 +143,50 @@ func handleCLIRun(args []string) {
 
 	// Load environment
 	env := make(map[string]string)
-	if envPath != "" {
-		envData, err := os.ReadFile(envPath)
+	if *envPath != "" {
+		envData, err := os.ReadFile(*envPath)
 		if err == nil {
 			var envObj struct {
-				Variables map[string]string `json:"variables"`
+				Variables []struct {
+					Key   string `json:"key"`
+					Value string `json:"value"`
+				} `json:"variables"`
 			}
 			json.Unmarshal(envData, &envObj)
-			env = envObj.Variables
+			for _, v := range envObj.Variables {
+				env[v.Key] = v.Value
+			}
 		}
 	}
 
-	fmt.Printf("Running collection: %s\n", col.Name)
+	fmt.Printf("Running collection: %s (%d iterations)\n", col.Name, *iterations)
 	fmt.Println("--------------------------------------------------")
 
-	stats, err := runner.RunCollection(col, env)
-	if err != nil {
-		fmt.Printf("Run failed: %v\n", err)
-		os.Exit(1)
+	var totalPassed, totalFailed int
+	var totalDuration int64
+
+	for iter := 1; iter <= *iterations; iter++ {
+		if *iterations > 1 {
+			fmt.Printf("\nIteration %d:\n", iter)
+		}
+		stats, err := runner.RunCollection(col, env)
+		if err != nil {
+			fmt.Printf("Run failed: %v\n", err)
+			os.Exit(1)
+		}
+		totalPassed += stats.Passed
+		totalFailed += stats.Failed
+		totalDuration += stats.DurationMs
+		
+		if *delay > 0 && iter < *iterations {
+			time.Sleep(time.Duration(*delay) * time.Millisecond)
+		}
 	}
 
 	fmt.Println("--------------------------------------------------")
-	fmt.Printf("Run Summary: %d Passed, %d Failed, %dms Total\n", stats.Passed, stats.Failed, stats.DurationMs)
+	fmt.Printf("Run Summary: %d Passed, %d Failed, %dms Total\n", totalPassed, totalFailed, totalDuration)
 
-	if stats.Failed > 0 {
+	if totalFailed > 0 {
 		os.Exit(1)
 	}
 }
@@ -177,11 +200,42 @@ func handleCLIMock(args []string) {
 	fmt.Sscanf(args[0], "%d", &port)
 	fmt.Printf("Starting standalone mock server on port %d...\n", port)
 	
-	mockSvc := mock.New(port)
+	mockSvc := mock.New(port, nil)
 	// Optionally load rules from a file here...
 	
 	if err := mockSvc.Start(); err != nil {
 		fmt.Printf("Mock server error: %v\n", err)
 		os.Exit(1)
 	}
+}
+
+func handleCLIInit(args []string) {
+	fmt.Println("Initializing Parallax workspace...")
+	
+	dirs := []string{
+		".parallax",
+		".parallax/collections",
+		".parallax/environments",
+		".parallax/history",
+		".parallax/reports",
+	}
+
+	for _, dir := range dirs {
+		if err := os.MkdirAll(dir, 0755); err != nil {
+			fmt.Printf("Error creating directory %s: %v\n", dir, err)
+			os.Exit(1)
+		}
+	}
+
+	// Create a dummy environment
+	dummyEnv := map[string]interface{}{
+		"name": "Default",
+		"variables": []map[string]string{
+			{"key": "baseUrl", "value": "http://localhost:8080"},
+		},
+	}
+	envData, _ := json.MarshalIndent(dummyEnv, "", "  ")
+	os.WriteFile(".parallax/environments/default.json", envData, 0644)
+
+	fmt.Println("✓ Workspace initialized. You can now use 'parallax run'.")
 }

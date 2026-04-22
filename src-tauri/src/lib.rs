@@ -56,6 +56,7 @@ pub fn run() {
             commands::loadtest::run_load_test,
             commands::mock::add_mock_rule,
             commands::mock::remove_mock_rule,
+            commands::mock::list_mock_rules,
             // Dashboard (Proxy & Health)
             commands::proxy::start_proxy_stream,
             commands::proxy::get_proxy_traffic,

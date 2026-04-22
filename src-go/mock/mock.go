@@ -8,6 +8,9 @@ import (
 	"strings"
 	"sync"
 	"text/template"
+	"encoding/json"
+
+	"github.com/bluephoenix/parallax-worker/storage"
 )
 
 type MockRule struct {
@@ -25,25 +28,75 @@ type Server struct {
 	mu     sync.RWMutex
 	rules  map[string]MockRule
 	server *http.Server
+	store  *storage.Storage
 }
 
-func New(port int) *Server {
-	return &Server{
+func New(port int, store *storage.Storage) *Server {
+	s := &Server{
 		port:  port,
 		rules: make(map[string]MockRule),
+		store: store,
 	}
+	s.loadRules()
+	return s
+}
+
+func (s *Server) loadRules() {
+	if s.store == nil {
+		return
+	}
+	rules, err := s.store.GetAllMockRules()
+	if err != nil {
+		log.Printf("[mock] Failed to load rules: %v", err)
+		return
+	}
+	for _, r := range rules {
+		headers := make(map[string]string)
+		json.Unmarshal([]byte(r["headers"].(string)), &headers)
+		
+		s.rules[r["id"].(string)] = MockRule{
+			ID:          r["id"].(string),
+			Path:        r["path"].(string),
+			Method:      r["method"].(string),
+			StatusCode:  r["status_code"].(int),
+			Body:        r["body"].(string),
+			Headers:     headers,
+			ContentType: r["content_type"].(string),
+		}
+	}
+	log.Printf("[mock] Loaded %d rules from persistence", len(s.rules))
+}
+
+func (s *Server) GetRules() ([]MockRule, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	
+	result := make([]MockRule, 0, len(s.rules))
+	for _, r := range s.rules {
+		result = append(result, r)
+	}
+	return result, nil
 }
 
 func (s *Server) AddRule(rule MockRule) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.rules[rule.ID] = rule
+	
+	if s.store != nil {
+		h, _ := json.Marshal(rule.Headers)
+		s.store.SaveMockRule(rule.ID, rule.Path, rule.Method, rule.StatusCode, rule.Body, string(h), rule.ContentType)
+	}
 }
 
 func (s *Server) RemoveRule(id string) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	delete(s.rules, id)
+	
+	if s.store != nil {
+		s.store.DeleteMockRule(id)
+	}
 }
 
 func (s *Server) Start() error {

@@ -287,6 +287,27 @@ func (s *Server) StopLoadTest(ctx context.Context, req *pb.StopRequest) (*pb.Gen
 // -----------------------------------------------------------------------------
 // MockService
 // -----------------------------------------------------------------------------
+func (s *Server) ListRules(ctx context.Context, req *pb.GenericRequest) (*pb.MockRuleList, error) {
+	rules, err := s.mockSvc.GetRules()
+	if err != nil {
+		return nil, err
+	}
+
+	pbRules := make([]*pb.MockRule, 0, len(rules))
+	for _, r := range rules {
+		pbRules = append(pbRules, &pb.MockRule{
+			Id:          r.ID,
+			Path:        r.Path,
+			Method:      r.Method,
+			StatusCode:  int32(r.StatusCode),
+			Body:        r.Body,
+			Headers:     r.Headers,
+			ContentType: r.ContentType,
+		})
+	}
+	return &pb.MockRuleList{Rules: pbRules}, nil
+}
+
 func (s *Server) AddRule(ctx context.Context, req *pb.MockRule) (*pb.GenericResponse, error) {
 	s.mockSvc.AddRule(mock.MockRule{
 		ID:          req.Id,

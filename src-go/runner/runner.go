@@ -2,6 +2,7 @@ package runner
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
@@ -112,8 +113,8 @@ func runRequest(req models.CollectionRequest, env map[string]string, stats *RunS
 	respBodyStr := string(respBodyBytes)
 
 	// Test Script
-	testsPassed := 0
-	testsFailed := 0
+	var testResults []string
+	var testErrors []string
 	if req.Scripts != nil && req.Scripts.Tests != "" {
 		vm.Set("pm", map[string]interface{}{
 			"environment": map[string]interface{}{
@@ -122,38 +123,71 @@ func runRequest(req models.CollectionRequest, env map[string]string, stats *RunS
 			},
 			"response": map[string]interface{}{
 				"code": resp.StatusCode,
-				"json": func() interface{} { return nil }, // simple mock
+				"json": func() interface{} {
+					var data interface{}
+					json.Unmarshal(respBodyBytes, &data)
+					return data
+				},
 				"text": func() string { return respBodyStr },
 			},
 			"test": func(name string, fn func()) {
-				// We wrap it so panics turn into failures
-				// For real use, we'd need more complex binding
-				testsPassed++
+				defer func() {
+					if r := recover(); r != nil {
+						testErrors = append(testErrors, fmt.Sprintf("%s: %v", name, r))
+					}
+				}()
+				fn()
+				testResults = append(testResults, name)
 			},
 			"expect": func(val interface{}) interface{} {
-				// Mock chai expect
 				return map[string]interface{}{
 					"to": map[string]interface{}{
-						"equal": func(exp interface{}) {},
-						"be": map[string]interface{}{
-							"ok": true,
+						"have": map[string]interface{}{
+							"status": func(s int) {
+								if resp.StatusCode != s {
+									panic(fmt.Sprintf("expected status %d but got %d", s, resp.StatusCode))
+								}
+							},
+						},
+						"equal": func(exp interface{}) {
+							if val != exp {
+								panic(fmt.Sprintf("expected %v but got %v", exp, val))
+							}
+						},
+						"include": func(exp interface{}) {
+							s, ok1 := val.(string)
+							e, ok2 := exp.(string)
+							if ok1 && ok2 {
+								if !strings.Contains(s, e) {
+									panic(fmt.Sprintf("expected %s to include %s", s, e))
+								}
+							}
 						},
 					},
 				}
 			},
 		})
 		if _, err := vm.RunString(req.Scripts.Tests); err != nil {
-			fmt.Printf("Test script error in %s: %v\n", req.Name, err)
-			testsFailed++
+			fmt.Printf("  Script Error: %v\n", err)
+			testErrors = append(testErrors, fmt.Sprintf("Script Error: %v", err))
 		}
 	}
 
-	if resp.StatusCode < 400 && testsFailed == 0 {
+	passed := len(testErrors) == 0
+
+	if resp.StatusCode < 400 && passed {
 		stats.Passed++
 		fmt.Printf("✓ %s [%s] - %d (%dms)\n", req.Name, req.Method, resp.StatusCode, duration.Milliseconds())
 	} else {
 		stats.Failed++
 		fmt.Printf("✗ %s [%s] - %d (%dms)\n", req.Name, req.Method, resp.StatusCode, duration.Milliseconds())
+	}
+
+	for _, t := range testResults {
+		fmt.Printf("  ✓ %s\n", t)
+	}
+	for _, e := range testErrors {
+		fmt.Printf("  ✗ %s\n", e)
 	}
 
 	return nil

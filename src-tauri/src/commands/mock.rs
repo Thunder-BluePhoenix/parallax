@@ -12,6 +12,7 @@ pub async fn add_mock_rule(
     status_code: i32,
     body: String,
     headers: std::collections::HashMap<String, String>,
+    content_type: String,
 ) -> Result<(), String> {
     let channel = Channel::from_static("http://127.0.0.1:50151")
         .connect()
@@ -26,7 +27,7 @@ pub async fn add_mock_rule(
         status_code,
         body,
         headers,
-        content_type: "".to_string(),
+        content_type,
     });
 
     client.add_rule(request).await.map_err(|e| e.to_string())?;
@@ -45,4 +46,18 @@ pub async fn remove_mock_rule(id: String) -> Result<(), String> {
 
     client.remove_rule(request).await.map_err(|e| e.to_string())?;
     Ok(())
+}
+
+#[command]
+pub async fn list_mock_rules() -> Result<Vec<MockRule>, String> {
+    let channel = Channel::from_static("http://127.0.0.1:50151")
+        .connect()
+        .await
+        .map_err(|e| e.to_string())?;
+
+    let mut client = MockServiceClient::new(channel);
+    let request = tonic::Request::new(pb::GenericRequest {});
+
+    let response = client.list_rules(request).await.map_err(|e| e.to_string())?;
+    Ok(response.into_inner().rules)
 }

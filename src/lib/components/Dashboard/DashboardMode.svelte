@@ -6,6 +6,7 @@
   import HealthHeatmapPanel from "./HealthHeatmapPanel.svelte";
   import LiveTrafficPanel from "./LiveTrafficPanel.svelte";
   import LoadTestPanel from "./LoadTestPanel.svelte";
+  import MockServerPanel from "./MockServerPanel.svelte";
 
   // Schema Explorer state
   let explorerPath = $state("");
@@ -17,13 +18,14 @@
     return fn ? (fn as any)(cmd, args) : Promise.reject("Tauri invoke not found");
   };
 
-  let activeSection = $state<"health" | "loadtest" | "proxy" | "history" | "ecosystem">("health");
+  let activeSection = $state<"health" | "loadtest" | "proxy" | "mock" | "history" | "ecosystem">("health");
   let workerConnected = $state(false);
 
   const sections = [
     { id: "health", label: "Health Monitor", icon: "❤" },
     { id: "loadtest", label: "Load Test", icon: "⚡" },
     { id: "proxy", label: "Traffic", icon: "🔀" },
+    { id: "mock", label: "Mock Server", icon: "🎭" },
     { id: "history", label: "Run History", icon: "🕒" },
     { id: "ecosystem", label: "Ecosystem", icon: "🔌" },
   ] as const;
@@ -134,6 +136,9 @@
 
     {:else if activeSection === "proxy"}
       <LiveTrafficPanel />
+
+    {:else if activeSection === "mock"}
+      <MockServerPanel />
 
     {:else if activeSection === "history"}
       <div class="dashboard-section animate-fade-in">

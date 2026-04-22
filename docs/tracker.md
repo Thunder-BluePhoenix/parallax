@@ -7,11 +7,12 @@ Last updated: 2026-04-23
 ## Overall Progress
 
 ```
-Phase 1  ███████████████████░  97%  🔄 Near Complete
-Phase 2  ████░░░░░░░░░░░░░░░░  20%  🔄 In Progress (Dashboard stub + Proxy + Health wired)
-Phase 3  ░░░░░░░░░░░░░░░░░░░░   0%  🔲 Planned
-Phase 4  ░░░░░░░░░░░░░░░░░░░░   0%  🔲 Planned
-Phase 5  ░░░░░░░░░░░░░░░░░░░░   0%  🔲 Planned
+Phase 1    ███████████████████░  97%  🔄 Near Complete
+Phase 2    ████░░░░░░░░░░░░░░░░  20%  🔄 In Progress (Dashboard stub + Proxy + Health wired)
+Phase 2.5  ░░░░░░░░░░░░░░░░░░░░   0%  🔲 Planned (Git Collaboration + Chat)
+Phase 3    ░░░░░░░░░░░░░░░░░░░░   0%  🔲 Planned
+Phase 4    ░░░░░░░░░░░░░░░░░░░░   0%  🔲 Planned
+Phase 5    ░░░░░░░░░░░░░░░░░░░░   0%  🔲 Planned
 ```
 
 ---
@@ -276,6 +277,84 @@ Phase 5  ░░░░░░░░░░░░░░░░░░░░   0%  🔲
 
 ---
 
+## Phase 2.5 — Git Collaboration & Team Chat
+
+> Not started. Architecture: Go sidecar as WebSocket chat broker, git repo as signaling + persistence layer. No Parallax cloud ever required.
+
+### Git-Native Workspace
+
+| Task | Status | Notes |
+|---|---|---|
+| Workspace as a git repo (`git init` / `git clone` on create) | 🔲 | `git2` Rust crate |
+| `commit` command — stage + commit `.parallax/` changes | 🔲 | Message from UI; author = GitHub identity |
+| `push` command — push to remote | 🔲 | |
+| `pull` command — fetch + merge remote changes | 🔲 | |
+| `stash` / `stash pop` commands | 🔲 | |
+| Branch create / switch / delete | 🔲 | Extend existing git branch chip in sidebar |
+| Conflict detection + diff view on pull | 🔲 | Show conflicting files; user resolves |
+| Commit history panel | 🔲 | Log of commits with author + message |
+| Git status badge on sidebar (uncommitted changes count) | 🔲 | |
+
+### GitHub OAuth Identity
+
+| Task | Status | Notes |
+|---|---|---|
+| GitHub OAuth2 PKCE flow via Tauri | 🔲 | Opens browser → redirect back to app |
+| Store GitHub token + user info in local keychain | 🔲 | `tauri-plugin-keychain` or OS keyring |
+| GitHub ID as universal user identity in Parallax | 🔲 | Used for commits, presence, chat |
+| Sign-out / revoke token | 🔲 | |
+| Display GitHub avatar + username in titlebar | 🔲 | |
+
+### Publish API Docs to GitHub
+
+| Task | Status | Notes |
+|---|---|---|
+| Generate static HTML docs from collection | 🔲 | Reuse Phase 3 doc generator |
+| Push generated docs to `gh-pages` branch | 🔲 | Auto-commit + push |
+| Publish settings: public repo / private repo toggle | 🔲 | |
+| Custom doc site title + description | 🔲 | |
+| "View live docs" button (opens GitHub Pages URL) | 🔲 | |
+
+### Team Workspaces
+
+| Task | Status | Notes |
+|---|---|---|
+| Invite teammate by GitHub username (adds as repo collaborator via GitHub API) | 🔲 | |
+| List team members in workspace sidebar | 🔲 | Pulled from GitHub repo collaborators |
+| Remove teammate (revoke collaborator access) | 🔲 | |
+| Each workspace has its own independent team | 🔲 | Natural: each workspace = separate repo |
+| Workspace visibility badge (public / private repo) | 🔲 | |
+
+### Real-Time Chat (Go Sidecar)
+
+| Task | Status | Notes |
+|---|---|---|
+| `Chat` gRPC service in Go sidecar | 🔲 | `ConnectPeer`, `SendMessage`, `GetHistory`, `SetPresence` |
+| Per-user enable/disable toggle (local config, not committed) | 🔲 | When disabled: sidecar skips chat listener, user appears offline |
+| Peer discovery via `.parallax/team/presence.json` (committed to repo) | 🔲 | `{github-id}:{ip}:{port}` written on connect, pulled by peers |
+| Direct P2P WebSocket between sidecars (same network / VPN) | 🔲 | Default mode |
+| Git-relay fallback (messages as `.parallax/chat/{workspace-id}/messages.jsonl`, polling 15s) | 🔲 | Works across internet without any relay server |
+| Custom relay URL (optional, user-configured) | 🔲 | Self-hosted WebSocket relay for remote teams |
+| Chat persistence — append-only JSONL, git-tracked | 🔲 | Full history versioned with the workspace |
+| Offline message queue — flush on next push | 🔲 | |
+| Chat UI panel in Dashboard / workspace view | 🔲 | Threaded by workspace; GitHub avatar + username per message |
+| Online presence indicators (green dot on teammate avatar) | 🔲 | From `presence.json` + direct heartbeat |
+| Unread message badge | 🔲 | |
+
+### Phase 2.5 Success Criteria
+
+| Criteria | Status |
+|---|---|
+| User can commit/push/pull workspace changes from within Parallax | 🔲 |
+| GitHub login gives identity used for all git ops + chat | 🔲 |
+| Team invited by GitHub username can clone + join workspace | 🔲 |
+| API docs published to GitHub Pages in one click | 🔲 |
+| Chat works P2P on same network with no external server | 🔲 |
+| Chat falls back to git-relay when P2P unavailable | 🔲 |
+| Chat can be fully disabled per user with no side effects | 🔲 |
+
+---
+
 ## Phase 3 — AI Integration & MCP Server
 
 > Not started.
@@ -427,6 +506,12 @@ Phase 5  ░░░░░░░░░░░░░░░░░░░░   0%  🔲
 | 2026-04-23 | GraphQL schema browser uses inline panel in body tab | Avoids modal; keeps context while building queries |
 | 2026-04-23 | Tab persistence via `persistTabs()` on every mutation | Tabs survive app restarts without needing IPC |
 | 2026-04-23 | Sidebar export uses `postman-exporter.ts` canonical utility | Single source of truth for v2.1 format |
+| 2026-04-23 | Phase 2.5: Go sidecar is the chat WebSocket broker, not a Parallax cloud server | Local-first; no infra cost; fits existing sidecar architecture |
+| 2026-04-23 | Chat is per-user opt-in toggle (local config, never committed) | Privacy control; user appears offline when disabled |
+| 2026-04-23 | Peer discovery via `presence.json` committed to git repo | Git repo is the signaling layer; no external discovery server |
+| 2026-04-23 | Git-relay fallback stores chat as `.parallax/chat/*.jsonl` (polled every 15s) | Works cross-internet with zero relay infra |
+| 2026-04-23 | GitHub ID is universal identity (git author, presence, chat, team invites) | Eliminates separate user database; leverages existing GitHub social graph |
+| 2026-04-23 | Team = GitHub repo collaborators; invite by GitHub username via GitHub API | No Parallax user management needed; permissions enforced by GitHub |
 
 ---
 

@@ -2,7 +2,7 @@
   import { responseState, responseHistory, testResults, visualizerData } from "../../stores/app.svelte";
   import VisualizerIframe from "./VisualizerIframe.svelte";
 
-  let viewMode   = $state<"pretty" | "raw" | "headers" | "tests" | "history" | "visualize">("pretty");
+  let viewMode   = $state<"pretty" | "raw" | "headers" | "cookies" | "tests" | "history" | "visualize">("pretty");
   let historyIdx = $state(0);
 
   function statusClass(code: number) {
@@ -72,6 +72,16 @@
         {/each}
         <button
           class="view-mode-btn"
+          class:active={viewMode === "cookies"}
+          onclick={() => (viewMode = "cookies")}
+        >
+          Cookies
+          {#if (responseState.response?.cookies?.length ?? 0) > 0}
+            <span class="test-badge">{responseState.response!.cookies.length}</span>
+          {/if}
+        </button>
+        <button
+          class="view-mode-btn"
           class:active={viewMode === "tests"}
           onclick={() => (viewMode = "tests")}
         >
@@ -131,6 +141,33 @@
               <span class="header-val mono">{val}</span>
             </div>
           {/each}
+        </div>
+
+      {:else if viewMode === "cookies"}
+        <div class="cookies-viewer">
+          {#if !res.cookies?.length}
+            <p class="tests-empty">No cookies returned by this response.</p>
+          {:else}
+            <table class="cookie-table">
+              <thead>
+                <tr>
+                  <th>Name</th><th>Value</th><th>Domain</th><th>Path</th><th>Secure</th><th>HttpOnly</th>
+                </tr>
+              </thead>
+              <tbody>
+                {#each res.cookies as c}
+                  <tr>
+                    <td class="mono">{c.name}</td>
+                    <td class="mono cookie-value">{c.value}</td>
+                    <td class="mono">{c.domain ?? "—"}</td>
+                    <td class="mono">{c.path ?? "/"}</td>
+                    <td class="cookie-flag" class:flag-on={c.secure}>{c.secure ? "✓" : "—"}</td>
+                    <td class="cookie-flag" class:flag-on={c.httpOnly}>{c.httpOnly ? "✓" : "—"}</td>
+                  </tr>
+                {/each}
+              </tbody>
+            </table>
+          {/if}
         </div>
 
       {:else if viewMode === "tests"}
@@ -404,6 +441,34 @@
     background: var(--color-error-dim);
     color: var(--color-error);
   }
+
+  /* Cookies panel */
+  .cookies-viewer { padding: 8px 12px; overflow-x: auto; }
+
+  .cookie-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 11px;
+  }
+  .cookie-table th {
+    text-align: left;
+    padding: 4px 8px;
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--text-muted);
+    border-bottom: 1px solid var(--border-subtle);
+  }
+  .cookie-table td {
+    padding: 5px 8px;
+    border-bottom: 1px solid var(--border-subtle);
+    color: var(--text-secondary);
+    vertical-align: top;
+  }
+  .cookie-value { max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .cookie-flag { text-align: center; color: var(--text-muted); }
+  .cookie-flag.flag-on { color: var(--color-success); font-weight: 700; }
 
   /* Tests panel */
   .tests-viewer { padding: 8px 12px; display: flex; flex-direction: column; gap: 2px; }

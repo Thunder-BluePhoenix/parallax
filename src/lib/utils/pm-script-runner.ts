@@ -2,6 +2,7 @@
 // Postman-compatible API surface executed via sandboxed Function()
 
 import type { ResponseState, TestResult } from "../stores/app.svelte";
+import { invoke } from "@tauri-apps/api/core";
 
 // ── pm object factory ─────────────────────────────────────────────────────────
 function buildPm(env: Record<string, string>, response?: ResponseState) {
@@ -37,7 +38,7 @@ function buildPm(env: Record<string, string>, response?: ResponseState) {
 
   const pm = {
     environment: pmEnv,
-    globals:     pmEnv, // share same store for simplicity
+    globals:     pmEnv,
     variables:   pmEnv,
     response:    pmResponse,
     visualizer: {
@@ -45,6 +46,36 @@ function buildPm(env: Record<string, string>, response?: ResponseState) {
         visualizerState.template = template;
         visualizerState.data = data ?? null;
       },
+    },
+
+    // pm.sendRequest(options, callback) — fire a sub-request from script
+    sendRequest: (
+      options: { url: string; method?: string; header?: Record<string,string>; body?: { mode: string; raw: string } },
+      callback: (err: string | null, res: any) => void,
+    ) => {
+      const req = {
+        id: crypto.randomUUID(), name: "pm.sendRequest",
+        method: options.method ?? "GET",
+        url: options.url,
+        headers: options.header ?? {},
+        params: null, body: null, auth: null,
+        timeout_ms: 10000, follow_redirects: true,
+      };
+      if (options.body?.raw) {
+        (req as any).body = { type: "json", content: null, raw: options.body.raw };
+      }
+      invoke<any>("send_request", { request: req, environment: env })
+        .then(result => {
+          const res = {
+            code: result.status,
+            status: result.status_text,
+            headers: { get: (k: string) => Object.entries(result.headers ?? {}).find(([h]) => h.toLowerCase() === k.toLowerCase())?.[1] },
+            text: () => result.body?.raw ?? "",
+            json: () => result.body?.json ?? (() => { try { return JSON.parse(result.body?.raw ?? ""); } catch { return null; } })(),
+          };
+          callback(null, res);
+        })
+        .catch(e => callback(String(e), null));
     },
 
     test: (name: string, fn: () => void) => {

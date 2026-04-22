@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { tabs, activeRequest, responseState, sendRequest } from "../../stores/app.svelte";
+  import { tabs, activeRequest, responseState, sendRequest, persistTabs } from "../../stores/app.svelte";
   import RequestPanel from "./RequestPanel.svelte";
   import ResponsePanel from "./ResponsePanel.svelte";
   import WebSocketPane from "./WebSocketPane.svelte";
@@ -23,6 +23,7 @@
     if (tabs.activeId === id && tabs.list.length > 0) {
       tabs.activeId = tabs.list[Math.max(0, idx - 1)].id;
     }
+    persistTabs();
   }
 </script>
 
@@ -39,8 +40,8 @@
           role="tab"
           tabindex="0"
           aria-selected={tabs.activeId === tab.id}
-          onclick={() => (tabs.activeId = tab.id)}
-          onkeydown={(e) => e.key === "Enter" && (tabs.activeId = tab.id)}
+          onclick={() => { tabs.activeId = tab.id; persistTabs(); }}
+          onkeydown={(e) => { if (e.key === "Enter") { tabs.activeId = tab.id; persistTabs(); } }}
         >
           <span class="method-badge method-{tab.method}">{tab.method}</span>
           <span class="tab-name">{tab.name}</span>
@@ -56,6 +57,7 @@
       const id = uuid();
       tabs.list.push({ id, name: "New Request", method: "GET", modified: false });
       tabs.activeId = id;
+      persistTabs();
     }}>+</button>
   </div>
 

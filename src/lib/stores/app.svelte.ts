@@ -43,7 +43,9 @@ export type HttpMethod = "GET" | "POST" | "PUT" | "PATCH" | "DELETE" | "HEAD" | 
 export interface AuthState {
   type: "none" | "bearer" | "basic" | "api_key" | "ecosystem_provider";
   token: string; username: string; password: string;
-  apiKeyHeader: string; apiKeyValue: string; provider: string; providerSession: any | null;
+  apiKeyHeader: string; apiKeyValue: string;
+  apiKeyLocation: "header" | "query";
+  provider: string; providerSession: any | null;
 }
 export interface RequestState {
   id: string; name: string; method: HttpMethod; url: string;
@@ -54,7 +56,8 @@ export interface RequestState {
 
 export function defaultAuth(): AuthState {
   return { type: "none", token: "", username: "", password: "",
-           apiKeyHeader: "X-API-Key", apiKeyValue: "", provider: "frappe", providerSession: null };
+           apiKeyHeader: "X-API-Key", apiKeyValue: "", apiKeyLocation: "header",
+           provider: "frappe", providerSession: null };
 }
 
 export const activeRequest = $state<RequestState>({
@@ -65,11 +68,18 @@ export const activeRequest = $state<RequestState>({
 // ============================================================
 // Response state
 // ============================================================
+export interface CookieInfo {
+  name: string; value: string; domain?: string | null;
+  path?: string | null; secure: boolean; httpOnly: boolean;
+}
 export interface ResponseState {
   status: number; statusText: string; headers: Record<string, string>;
   body: { raw: string; json: any | null; contentType: string };
   timing: { totalMs: number }; sizeBytes: number;
+  cookies: CookieInfo[];
 }
+// Cache of last response per request name — used by {% response %} tag
+export const responseCache = $state<Record<string, ResponseState>>({});
 export const responseState = $state<{ loading: boolean; response: ResponseState | null; error: string | null }>({
   loading: false, response: null, error: null,
 });
@@ -111,10 +121,21 @@ export const collectionVariables = $state<{ variables: Record<string, string> }>
 // Tabs
 // ============================================================
 export interface RequestTab { id: string; name: string; method: HttpMethod; modified: boolean; }
-export const tabs = $state<{ list: RequestTab[]; activeId: string }>({
-  list: [{ id: "default", name: "New Request", method: "GET", modified: false }],
-  activeId: "default",
-});
+
+function loadPersistedTabs(): { list: RequestTab[]; activeId: string } {
+  try {
+    const raw = localStorage.getItem("parallax:tabs");
+    if (raw) return JSON.parse(raw);
+  } catch { /* ignore */ }
+  return { list: [{ id: "default", name: "New Request", method: "GET", modified: false }], activeId: "default" };
+}
+
+export const tabs = $state<{ list: RequestTab[]; activeId: string }>(loadPersistedTabs());
+
+export function persistTabs() {
+  try { localStorage.setItem("parallax:tabs", JSON.stringify({ list: tabs.list, activeId: tabs.activeId })); }
+  catch { /* ignore */ }
+}
 
 export const authSessions = $state<Record<string, any>>({});
 
@@ -156,8 +177,9 @@ export function loadRequestIntoTab(req: CollectionRequest) {
     activeRequest.auth.token        = a.token ?? "";
     activeRequest.auth.username     = a.username ?? "";
     activeRequest.auth.password     = a.password ?? "";
-    activeRequest.auth.apiKeyHeader = a.api_key_header ?? "X-API-Key";
-    activeRequest.auth.apiKeyValue  = a.api_key_value ?? "";
+    activeRequest.auth.apiKeyHeader   = a.api_key_header ?? "X-API-Key";
+    activeRequest.auth.apiKeyValue    = a.api_key_value ?? "";
+    activeRequest.auth.apiKeyLocation = (a.api_key_location === "query") ? "query" : "header";
     activeRequest.auth.provider     = a.provider ?? "frappe";
   }
 
@@ -276,7 +298,7 @@ export async function sendRequest() {
       await runPreRequestScript(activeScripts.preRequest, mergedEnv);
     }
 
-    const payload = resolveRequestTemplates(buildPayload(), mergedEnv);
+    const payload = resolveRequestTemplates(buildPayload(), mergedEnv, { ...responseCache });
 
     const result = await invoke<any>("send_request", {
       request:     payload,
@@ -294,9 +316,15 @@ export async function sendRequest() {
       },
       timing:    { totalMs: result.timing?.total_ms ?? (Date.now() - t0) },
       sizeBytes: result.size_bytes ?? 0,
+      cookies:   (result.cookies ?? []).map((c: any) => ({
+        name: c.name, value: c.value, domain: c.domain ?? null,
+        path: c.path ?? null, secure: c.secure ?? false, httpOnly: c.http_only ?? false,
+      })),
     };
 
     responseState.response = response;
+    // Cache response by request name for {% response %} tag chaining
+    responseCache[activeRequest.name] = response;
 
     // Run test script
     if (activeScripts.tests.trim()) {
@@ -348,7 +376,8 @@ function buildAuth() {
   return {
     auth_type: a.type, token: a.token || null, username: a.username || null,
     password: a.password || null, api_key_header: a.apiKeyHeader || null,
-    api_key_value: a.apiKeyValue || null, provider: a.provider || null,
+    api_key_value: a.apiKeyValue || null, api_key_location: a.apiKeyLocation || "header",
+    provider: a.provider || null,
     provider_session: a.providerSession || null,
   };
 }

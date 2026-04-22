@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { invoke } from "@tauri-apps/api/core";
   import { activeRequest, activeScripts } from "../../stores/app.svelte";
 
   let { activeTab = $bindable() } = $props<{ activeTab: string }>();
@@ -24,6 +25,60 @@
     { value: "raw", label: "Raw" },
     { value: "graphql", label: "GraphQL" },
   ];
+
+  // ── GraphQL schema introspection ──────────────────────────────
+  let schemaTypes = $state<Array<{ name: string; kind: string }>>([]);
+  let schemaLoading = $state(false);
+  let schemaError = $state("");
+  let schemaVisible = $state(false);
+
+  const INTROSPECTION_QUERY = `{
+  __schema {
+    queryType { name }
+    types {
+      name
+      kind
+      description
+      fields { name type { name kind ofType { name kind } } }
+    }
+  }
+}`;
+
+  async function fetchSchema() {
+    if (!activeRequest.url) return;
+    schemaLoading = true;
+    schemaError = "";
+    try {
+      const result = await invoke<any>("send_request", {
+        request: {
+          id: "gql-introspect",
+          name: "GraphQL Introspection",
+          method: "POST",
+          url: activeRequest.url,
+          headers: { ...activeRequest.headers, "Content-Type": "application/json" },
+          params: null,
+          body: {
+            type: "json",
+            content: { query: INTROSPECTION_QUERY },
+            raw: JSON.stringify({ query: INTROSPECTION_QUERY }),
+          },
+          auth: null,
+          timeout_ms: 15000,
+          follow_redirects: true,
+        },
+        environment: {},
+      });
+      const data = result.body?.json ?? JSON.parse(result.body?.raw ?? "{}");
+      const types: any[] = data?.data?.__schema?.types ?? [];
+      schemaTypes = types.filter((t) => !t.name.startsWith("__"));
+      schemaVisible = schemaTypes.length > 0;
+      if (!schemaTypes.length) schemaError = "No types returned. Is this a GraphQL endpoint?";
+    } catch (e: any) {
+      schemaError = String(e);
+    } finally {
+      schemaLoading = false;
+    }
+  }
 </script>
 
 <div class="request-panel pane">
@@ -103,16 +158,55 @@
           {/each}
         </div>
 
-        {#if activeRequest.bodyType !== "none"}
+        {#if activeRequest.bodyType === "none"}
+          <div class="no-body">
+            <span>This request has no body</span>
+          </div>
+        {:else if activeRequest.bodyType === "graphql"}
+          <div class="gql-toolbar">
+            <span class="gql-hint mono">Format: {"{"}  "query": "...", "variables": {"{}"} {"}"}</span>
+            <button
+              class="gql-schema-btn"
+              onclick={fetchSchema}
+              disabled={schemaLoading || !activeRequest.url}
+            >
+              {#if schemaLoading}
+                <span class="spinner-xs"></span> Loading…
+              {:else}
+                Fetch Schema
+              {/if}
+            </button>
+          </div>
+          <textarea
+            class="body-textarea mono"
+            placeholder={'{\n  "query": "{ __typename }",\n  "variables": {}\n}'}
+            bind:value={activeRequest.bodyContent}
+          ></textarea>
+          {#if schemaError}
+            <div class="gql-error">{schemaError}</div>
+          {/if}
+          {#if schemaVisible && schemaTypes.length > 0}
+            <div class="gql-schema-panel">
+              <div class="gql-schema-header">
+                Schema — {schemaTypes.length} types
+                <button class="gql-close" onclick={() => (schemaVisible = false)}>×</button>
+              </div>
+              <div class="gql-schema-list scroll-y">
+                {#each schemaTypes as t}
+                  <div class="gql-type-row">
+                    <span class="gql-kind gql-kind-{t.kind.toLowerCase()}">{t.kind}</span>
+                    <span class="gql-type-name mono">{t.name}</span>
+                  </div>
+                {/each}
+              </div>
+            </div>
+          {/if}
+        {:else}
           <textarea
             class="body-textarea mono"
             placeholder={activeRequest.bodyType === "json" ? '{\n  "key": "value"\n}' : "Request body..."}
             bind:value={activeRequest.bodyContent}
           ></textarea>
-        {:else}
-          <div class="no-body">
-            <span>This request has no body</span>
-          </div>
         {/if}
       </div>
 
@@ -145,8 +239,20 @@
 
         {:else if activeRequest.auth.type === "api_key"}
           <div class="auth-fields">
-            <label for="auth-key-header" class="field-label">Header Name</label>
-            <input id="auth-key-header" type="text" placeholder="X-API-Key" bind:value={activeRequest.auth.apiKeyHeader} />
+            <label for="auth-key-loc" class="field-label">Add to</label>
+            <select id="auth-key-loc" bind:value={activeRequest.auth.apiKeyLocation}>
+              <option value="header">Header</option>
+              <option value="query">Query Param</option>
+            </select>
+            <label for="auth-key-header" class="field-label mt">
+              {activeRequest.auth.apiKeyLocation === "query" ? "Param Name" : "Header Name"}
+            </label>
+            <input
+              id="auth-key-header"
+              type="text"
+              placeholder={activeRequest.auth.apiKeyLocation === "query" ? "api_key" : "X-API-Key"}
+              bind:value={activeRequest.auth.apiKeyHeader}
+            />
             <label for="auth-key-value" class="field-label mt">Value</label>
             <input id="auth-key-value" class="mono" type="text" placeholder="API key value" bind:value={activeRequest.auth.apiKeyValue} />
           </div>
@@ -432,4 +538,110 @@
     color: var(--text-primary);
     height: 100%;
   }
+
+  /* GraphQL */
+  .gql-toolbar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 12px;
+    border-bottom: 1px solid var(--border-subtle);
+    flex-shrink: 0;
+    background: var(--bg-surface);
+  }
+  .gql-hint {
+    flex: 1;
+    font-size: 10px;
+    color: var(--text-muted);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .gql-schema-btn {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    padding: 4px 10px;
+    font-size: 11px;
+    background: var(--accent-primary-dim);
+    color: var(--accent-primary);
+    border-radius: var(--radius-sm);
+    flex-shrink: 0;
+    transition: var(--transition-fast);
+  }
+  .gql-schema-btn:hover:not(:disabled) { background: rgba(99,85,255,0.25); }
+  .gql-schema-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+  .spinner-xs {
+    width: 10px; height: 10px;
+    border: 2px solid currentColor;
+    border-top-color: transparent;
+    border-radius: 50%;
+    animation: spin 0.6s linear infinite;
+    display: inline-block;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .gql-error {
+    padding: 6px 12px;
+    font-size: 11px;
+    color: var(--color-error);
+    background: var(--color-error-dim);
+    flex-shrink: 0;
+  }
+  .gql-schema-panel {
+    border-top: 1px solid var(--border-default);
+    background: var(--bg-surface);
+    flex-shrink: 0;
+    max-height: 220px;
+    display: flex;
+    flex-direction: column;
+  }
+  .gql-schema-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 6px 12px;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text-secondary);
+    border-bottom: 1px solid var(--border-subtle);
+    flex-shrink: 0;
+  }
+  .gql-close {
+    background: transparent;
+    color: var(--text-muted);
+    font-size: 14px;
+    line-height: 1;
+    padding: 0 2px;
+  }
+  .gql-close:hover { color: var(--text-primary); }
+  .gql-schema-list {
+    flex: 1;
+    overflow-y: auto;
+    padding: 4px 0;
+  }
+  .gql-type-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 3px 12px;
+    font-size: 11px;
+  }
+  .gql-type-row:hover { background: var(--bg-elevated); }
+  .gql-kind {
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    padding: 1px 5px;
+    border-radius: 3px;
+    min-width: 60px;
+    text-align: center;
+    flex-shrink: 0;
+  }
+  .gql-kind-object    { background: rgba(63,185,80,0.15);  color: #3fb950; }
+  .gql-kind-scalar    { background: rgba(88,166,255,0.15); color: #58a6ff; }
+  .gql-kind-enum      { background: rgba(227,179,65,0.15); color: #e3b341; }
+  .gql-kind-input_object { background: rgba(124,110,255,0.15); color: #7c6eff; }
+  .gql-kind-interface { background: rgba(54,217,196,0.15); color: #36d9c4; }
+  .gql-kind-union     { background: rgba(255,127,80,0.15); color: #ff7f50; }
+  .gql-type-name { color: var(--text-primary); }
 </style>

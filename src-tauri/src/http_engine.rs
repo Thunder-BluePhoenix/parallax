@@ -50,6 +50,7 @@ pub struct AuthConfig {
     pub password: Option<String>,
     pub api_key_header: Option<String>,
     pub api_key_value: Option<String>,
+    pub api_key_location: Option<String>, // "header" (default) or "query"
     /// Provider-specific context (e.g., "frappe", "django", "laravel")
     pub provider: Option<String>,
     pub provider_session: Option<serde_json::Value>,
@@ -153,6 +154,19 @@ impl HttpEngine {
             }
         }
 
+        // API key injected as query param
+        if let Some(auth) = &req.auth {
+            if auth.auth_type == AuthType::ApiKey
+                && auth.api_key_location.as_deref() == Some("query")
+            {
+                if let (Some(key), Some(val)) = (&auth.api_key_header, &auth.api_key_value) {
+                    let key = Self::resolve_env(key, env);
+                    let val = Self::resolve_env(val, env);
+                    url.query_pairs_mut().append_pair(&key, &val);
+                }
+            }
+        }
+
         let method = Method::from_bytes(req.method.to_uppercase().as_bytes())
             .unwrap_or(Method::GET);
 
@@ -207,10 +221,12 @@ impl HttpEngine {
                 return builder.basic_auth(user, Some(pass));
             }
             AuthType::ApiKey => {
-                if let (Some(header), Some(value)) = (&auth.api_key_header, &auth.api_key_value) {
-                    let header = Self::resolve_env(header, env);
-                    let value = Self::resolve_env(value, env);
-                    return builder.header(header, value);
+                if auth.api_key_location.as_deref() != Some("query") {
+                    if let (Some(header), Some(value)) = (&auth.api_key_header, &auth.api_key_value) {
+                        let header = Self::resolve_env(header, env);
+                        let value = Self::resolve_env(value, env);
+                        return builder.header(header, value);
+                    }
                 }
             }
             AuthType::EcosystemProvider => {
@@ -297,6 +313,13 @@ impl HttpEngine {
             .cloned()
             .unwrap_or_default();
 
+        // Parse Set-Cookie headers before consuming response
+        let cookies: Vec<CookieInfo> = headers
+            .iter()
+            .filter(|(k, _)| k.to_lowercase() == "set-cookie")
+            .map(|(_, v)| parse_set_cookie(v))
+            .collect();
+
         let body_bytes = response.bytes().await?;
         let size_bytes = body_bytes.len();
         let raw = String::from_utf8_lossy(&body_bytes).to_string();
@@ -311,23 +334,40 @@ impl HttpEngine {
             status: status.as_u16(),
             status_text,
             headers,
-            body: ResponseBody {
-                raw,
-                json,
-                content_type,
-            },
+            body: ResponseBody { raw, json, content_type },
             timing: ResponseTiming {
                 total_ms: elapsed.as_millis(),
-                dns_ms: None,
-                connect_ms: None,
-                ttfb_ms: None,
+                dns_ms: None, connect_ms: None, ttfb_ms: None,
             },
-            cookies: vec![],
+            cookies,
             size_bytes,
             redirects: vec![],
         })
     }
 }
+
+fn parse_set_cookie(header: &str) -> CookieInfo {
+    let parts: Vec<&str> = header.split(';').collect();
+    let (name, value) = parts[0].split_once('=').unwrap_or(("", parts[0]));
+    let mut cookie = CookieInfo {
+        name: name.trim().to_string(),
+        value: value.trim().to_string(),
+        domain: None, path: None, secure: false, http_only: false,
+    };
+    for attr in parts.iter().skip(1) {
+        let a = attr.trim().to_lowercase();
+        if a == "secure"   { cookie.secure    = true; }
+        if a == "httponly" { cookie.http_only  = true; }
+        if let Some(d) = attr.trim().strip_prefix("domain=").or_else(|| attr.trim().strip_prefix("Domain=")) {
+            cookie.domain = Some(d.to_string());
+        }
+        if let Some(p) = attr.trim().strip_prefix("path=").or_else(|| attr.trim().strip_prefix("Path=")) {
+            cookie.path = Some(p.to_string());
+        }
+    }
+    cookie
+}
+
 
 impl Default for HttpEngine {
     fn default() -> Self {

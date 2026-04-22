@@ -28,6 +28,7 @@
   } from "../../stores/app.svelte";
   import EnvironmentPanel from "./EnvironmentPanel.svelte";
   import { importPostmanCollection, importInsomniaExport } from "../../utils/postman-importer";
+  import { exportPostmanCollection } from "../../utils/postman-exporter";
 
   let searchQuery   = $state("");
   const uuid = () => Math.random().toString(36).substring(2) + Date.now().toString(36);
@@ -161,42 +162,8 @@
   function exportCollection(colName: string) {
     const col = loadedCollections.find(c => c.name === colName);
     if (!col) return;
-
-    const postmanItems = [
-      ...col.requests.map(r => ({
-        name: r.name,
-        request: {
-          method: r.method,
-          url: { raw: r.url },
-          header: Object.entries(r.headers ?? {}).map(([key, value]) => ({ key, value })),
-          body: r.body ? { mode: "raw", raw: r.body.raw ?? "" } : undefined,
-        },
-      })),
-      ...col.folders.map(f => ({
-        name: f.name,
-        item: f.requests.map(r => ({
-          name: r.name,
-          request: {
-            method: r.method,
-            url: { raw: r.url },
-            header: Object.entries(r.headers ?? {}).map(([key, value]) => ({ key, value })),
-            body: r.body ? { mode: "raw", raw: r.body.raw ?? "" } : undefined,
-          },
-        })),
-      })),
-    ];
-
-    const exported = {
-      info: {
-        name: col.name,
-        description: col.description ?? "",
-        schema: "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
-      },
-      item: postmanItems,
-      variable: Object.entries(col.variables ?? {}).map(([key, value]) => ({ key, value })),
-    };
-
-    const blob = new Blob([JSON.stringify(exported, null, 2)], { type: "application/json" });
+    const json = exportPostmanCollection(col);
+    const blob = new Blob([json], { type: "application/json" });
     const a = document.createElement("a");
     a.href = URL.createObjectURL(blob);
     a.download = `${col.name}.postman_collection.json`;

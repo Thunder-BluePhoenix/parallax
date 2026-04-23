@@ -26,6 +26,9 @@
   let searchQuery = $state("");
   let filterMethod = $state<string>("ALL");
   let filterStatus = $state<string>("ALL");
+  let domainInclude = $state("");
+  let domainExclude = $state("");
+  let filterApplied = $state(false);
   let unlisten: () => void;
 
   let filteredTraffic = $derived(traffic.filter(t => {
@@ -61,6 +64,28 @@
     } catch (e) {
       console.error("Failed to clear traffic:", e);
     }
+  }
+
+  async function applyFilter() {
+    try {
+      await invoke("set_proxy_filter", {
+        includeDomains: domainInclude ? domainInclude.split(",").map((s: string) => s.trim()).filter(Boolean) : [],
+        excludeDomains: domainExclude ? domainExclude.split(",").map((s: string) => s.trim()).filter(Boolean) : [],
+        onlyMethods: filterMethod !== "ALL" ? [filterMethod] : [],
+        minStatus: 0,
+      });
+      filterApplied = !!(domainInclude || domainExclude || filterMethod !== "ALL");
+    } catch (e) {
+      console.error("Failed to apply filter:", e);
+    }
+  }
+
+  async function clearFilter() {
+    domainInclude = "";
+    domainExclude = "";
+    filterMethod = "ALL";
+    filterApplied = false;
+    await applyFilter();
   }
 
   onMount(async () => {
@@ -150,27 +175,31 @@
   <div class="proxy-controls">
     <div class="proxy-status">
       <Logo size={14} />
-      <span>Proxy listening on <span class="mono" style="color:var(--accent-secondary)">127.0.0.1:8888</span></span>
+      <span>Proxy on <span class="mono" style="color:var(--accent-secondary)">127.0.0.1:8888</span></span>
     </div>
     <div class="filter-group">
       <select bind:value={filterMethod} class="filter-select">
         <option value="ALL">All Methods</option>
-        <option>GET</option>
-        <option>POST</option>
-        <option>PUT</option>
-        <option>DELETE</option>
+        <option>GET</option><option>POST</option><option>PUT</option><option>DELETE</option>
       </select>
-      
       <select bind:value={filterStatus} class="filter-select">
         <option value="ALL">All Status</option>
-        <option value="2xx">Success (2xx)</option>
-        <option value="4xx">Client Error (4xx)</option>
-        <option value="5xx">Server Error (5xx)</option>
+        <option value="2xx">2xx</option><option value="4xx">4xx</option><option value="5xx">5xx</option>
       </select>
     </div>
-    <input type="text" class="filter-input" placeholder="Filter domain..." bind:value={searchQuery} />
+    <input type="text" class="filter-input" placeholder="Search URL..." bind:value={searchQuery} />
     <button class="btn-action" onclick={exportHAR}>Export HAR</button>
-    <button class="btn-action" onclick={clearTraffic}>Clear Traffic</button>
+    <button class="btn-action" onclick={clearTraffic}>Clear</button>
+  </div>
+
+  <!-- Go-side domain filter (persists across stream, reduces recording noise) -->
+  <div class="domain-filter-row">
+    <input type="text" class="filter-input flex-1" placeholder="Include domains (comma-separated, e.g. api.example.com)" bind:value={domainInclude} />
+    <input type="text" class="filter-input flex-1" placeholder="Exclude domains (e.g. fonts.googleapis.com)" bind:value={domainExclude} />
+    <button class="btn-action" class:active={filterApplied} onclick={applyFilter}>Apply Filter</button>
+    {#if filterApplied}
+      <button class="btn-action" onclick={clearFilter}>Clear Filter</button>
+    {/if}
   </div>
 
   <div class="traffic-list">
@@ -265,12 +294,17 @@
   .pulse-dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: var(--text-muted); }
   .pulse-dot.up { background: var(--color-success); animation: pulse-dot 2s infinite; }
 
+  .domain-filter-row {
+    display: flex; align-items: center; gap: 8px; margin-bottom: 12px; flex-shrink: 0;
+  }
   .filter-input {
     background: var(--bg-elevated); border: 1px solid var(--border-default);
     color: var(--text-primary); font-size: 12px; border-radius: var(--radius-md);
     padding: 6px 12px; width: 200px; outline: none;
   }
+  .filter-input.flex-1 { width: auto; flex: 1; }
   .filter-input:focus { border-color: var(--accent-primary); }
+  .btn-action.active { border-color: var(--accent-primary); color: var(--accent-primary); }
 
   .filter-group { display: flex; gap: 8px; }
   .filter-select {

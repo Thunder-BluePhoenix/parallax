@@ -122,8 +122,10 @@ func handleCLIRun(args []string) {
 	envPath := fs.String("e", "", "Environment file path")
 	globalsPath := fs.String("g", "", "Global variables file path")
 	iterations := fs.Int("i", 1, "Number of iterations")
-	delay := fs.Int("d", 0, "Delay between requests in ms")
-	verbose := fs.Bool("v", false, "Verbose output")
+	delay := fs.Int("d", 0, "Delay between iterations in ms")
+	verbose := fs.Bool("v", false, "Verbose output — print final env state")
+	dataFile := fs.String("data", "", "Data file path (CSV or JSON array) for data-driven runs")
+	reporter := fs.String("reporter", "text", "Reporter: text | html")
 	fs.Parse(args)
 
 	if fs.NArg() < 1 {
@@ -135,7 +137,6 @@ func handleCLIRun(args []string) {
 
 	colPath := fs.Arg(0)
 
-	// Load collection
 	colData, err := os.ReadFile(colPath)
 	if err != nil {
 		fmt.Printf("Error reading collection: %v\n", err)
@@ -155,32 +156,25 @@ func handleCLIRun(args []string) {
 		}
 	}
 
-	// Load environment
-	env := make(map[string]string)
+	// Base environment
+	baseEnv := make(map[string]string)
 	loadEnvFile := func(path string, prefix string) {
 		data, err := os.ReadFile(path)
 		if err != nil {
 			return
 		}
 		var envObj struct {
-			Values []struct {
-				Key   string      `json:"key"`
-				Value interface{} `json:"value"`
-			} `json:"values"`
-			Variables []struct { // Some formats use "variables"
-				Key   string      `json:"key"`
-				Value interface{} `json:"value"`
-			} `json:"variables"`
+			Values    []struct{ Key string; Value interface{} } `json:"values"`
+			Variables []struct{ Key string; Value interface{} } `json:"variables"`
 		}
 		json.Unmarshal(data, &envObj)
 		for _, v := range envObj.Values {
-			env[prefix+v.Key] = fmt.Sprintf("%v", v.Value)
+			baseEnv[prefix+v.Key] = fmt.Sprintf("%v", v.Value)
 		}
 		for _, v := range envObj.Variables {
-			env[prefix+v.Key] = fmt.Sprintf("%v", v.Value)
+			baseEnv[prefix+v.Key] = fmt.Sprintf("%v", v.Value)
 		}
 	}
-
 	if *envPath != "" {
 		loadEnvFile(*envPath, "")
 	}
@@ -188,8 +182,18 @@ func handleCLIRun(args []string) {
 		loadEnvFile(*globalsPath, "global.")
 	}
 
-	fmt.Printf("\n🚀 Running collection: %s\n", col.Name)
-	fmt.Printf("   Iterations: %d | Delay: %dms\n", *iterations, *delay)
+	// Load data rows for data-driven runs
+	dataRows := loadDataFile(*dataFile)
+	if len(dataRows) > 0 {
+		*iterations = len(dataRows)
+	}
+
+	fmt.Printf("\n Running collection: %s\n", col.Name)
+	fmt.Printf("   Iterations: %d | Delay: %dms", *iterations, *delay)
+	if *dataFile != "" {
+		fmt.Printf(" | Data: %s (%d rows)", *dataFile, len(dataRows))
+	}
+	fmt.Println()
 	fmt.Println("--------------------------------------------------")
 
 	var totalPassed, totalFailed int
@@ -199,6 +203,18 @@ func handleCLIRun(args []string) {
 		if *iterations > 1 {
 			fmt.Printf("\n[Iteration %d]\n", iter)
 		}
+
+		// Merge base env + data row override
+		env := make(map[string]string, len(baseEnv))
+		for k, v := range baseEnv {
+			env[k] = v
+		}
+		if iter-1 < len(dataRows) {
+			for k, v := range dataRows[iter-1] {
+				env[k] = v
+			}
+		}
+
 		stats, err := runner.RunCollection(col, env)
 		if err != nil {
 			fmt.Printf("Run failed: %v\n", err)
@@ -207,31 +223,137 @@ func handleCLIRun(args []string) {
 		totalPassed += stats.Passed
 		totalFailed += stats.Failed
 		totalDuration += stats.DurationMs
-		
+
 		if *delay > 0 && iter < *iterations {
 			time.Sleep(time.Duration(*delay) * time.Millisecond)
 		}
 	}
 
 	fmt.Println("\n--------------------------------------------------")
-	fmt.Printf("🏁 Run Summary:\n")
-	fmt.Printf("   ✅ Passed: %d\n", totalPassed)
-	fmt.Printf("   ❌ Failed: %d\n", totalFailed)
-	fmt.Printf("   ⏱️  Total Duration: %dms\n", totalDuration)
+	fmt.Printf("Run Summary:\n")
+	fmt.Printf("   Passed:   %d\n", totalPassed)
+	fmt.Printf("   Failed:   %d\n", totalFailed)
+	fmt.Printf("   Duration: %dms\n", totalDuration)
 
-	if totalFailed > 0 {
-		fmt.Printf("\n❌ Build FAILED (%d failed assertions)\n", totalFailed)
-		os.Exit(1)
-	} else {
-		fmt.Printf("\n✅ Build PASSED\n")
+	if *reporter == "html" {
+		writeHTMLReport(col.Name, totalPassed, totalFailed, totalDuration)
 	}
 
 	if *verbose {
-		// Log detailed environment state if requested
 		fmt.Printf("\nFinal Environment State:\n")
-		for k, v := range env {
+		for k, v := range baseEnv {
 			fmt.Printf("  %s: %s\n", k, v)
 		}
+	}
+
+	if totalFailed > 0 {
+		fmt.Printf("\nBuild FAILED (%d failed)\n", totalFailed)
+		os.Exit(1)
+	}
+	fmt.Printf("\nBuild PASSED\n")
+}
+
+// loadDataFile parses a CSV or JSON array data file into a slice of row maps.
+func loadDataFile(path string) []map[string]string {
+	if path == "" {
+		return nil
+	}
+	data, err := os.ReadFile(path)
+	if err != nil {
+		fmt.Printf("Warning: could not read data file: %v\n", err)
+		return nil
+	}
+
+	// JSON array: [{...}, {...}]
+	if strings.HasSuffix(path, ".json") {
+		var rows []map[string]interface{}
+		if err := json.Unmarshal(data, &rows); err != nil {
+			fmt.Printf("Warning: could not parse JSON data file: %v\n", err)
+			return nil
+		}
+		result := make([]map[string]string, len(rows))
+		for i, row := range rows {
+			m := make(map[string]string, len(row))
+			for k, v := range row {
+				m[k] = fmt.Sprintf("%v", v)
+			}
+			result[i] = m
+		}
+		return result
+	}
+
+	// CSV: header row + data rows
+	lines := strings.Split(strings.ReplaceAll(string(data), "\r\n", "\n"), "\n")
+	if len(lines) < 2 {
+		return nil
+	}
+	headers := strings.Split(lines[0], ",")
+	var result []map[string]string
+	for _, line := range lines[1:] {
+		line = strings.TrimSpace(line)
+		if line == "" {
+			continue
+		}
+		cells := strings.Split(line, ",")
+		row := make(map[string]string, len(headers))
+		for i, h := range headers {
+			if i < len(cells) {
+				row[strings.TrimSpace(h)] = strings.TrimSpace(cells[i])
+			}
+		}
+		result = append(result, row)
+	}
+	return result
+}
+
+// writeHTMLReport writes a self-contained HTML report to .parallax/reports/.
+func writeHTMLReport(name string, passed, failed int, durationMs int64) {
+	os.MkdirAll(".parallax/reports", 0755)
+	total := passed + failed
+	pct := 0
+	if total > 0 {
+		pct = passed * 100 / total
+	}
+	status := "PASSED"
+	statusColor := "#3fb950"
+	if failed > 0 {
+		status = "FAILED"
+		statusColor = "#f85149"
+	}
+	html := fmt.Sprintf(`<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="UTF-8"><title>Parallax Run Report — %s</title>
+<style>
+  body{font-family:system-ui,sans-serif;background:#0d1117;color:#c9d1d9;margin:0;padding:32px}
+  h1{font-size:22px;margin-bottom:4px}
+  .meta{font-size:13px;color:#8b949e;margin-bottom:32px}
+  .summary{display:flex;gap:24px;margin-bottom:32px}
+  .card{background:#161b22;border:1px solid #30363d;border-radius:8px;padding:20px 28px}
+  .card-label{font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:#8b949e;margin-bottom:6px}
+  .card-value{font-size:32px;font-weight:700;font-family:monospace}
+  .status{display:inline-block;padding:6px 20px;border-radius:20px;font-weight:700;font-size:14px;background:%s22;color:%s;border:1px solid %s44}
+</style>
+</head>
+<body>
+<h1>%s</h1>
+<p class="meta">Generated by parallax-cli • Duration: %dms</p>
+<div class="summary">
+  <div class="card"><div class="card-label">Status</div><div><span class="status">%s</span></div></div>
+  <div class="card"><div class="card-label">Passed</div><div class="card-value" style="color:#3fb950">%d</div></div>
+  <div class="card"><div class="card-label">Failed</div><div class="card-value" style="color:#f85149">%d</div></div>
+  <div class="card"><div class="card-label">Total</div><div class="card-value">%d</div></div>
+  <div class="card"><div class="card-label">Pass Rate</div><div class="card-value">%d%%</div></div>
+</div>
+</body></html>`,
+		name,
+		statusColor, statusColor, statusColor,
+		name, durationMs,
+		status,
+		passed, failed, total, pct,
+	)
+	reportPath := fmt.Sprintf(".parallax/reports/run-%d.html", time.Now().UnixMilli())
+	if err := os.WriteFile(reportPath, []byte(html), 0644); err == nil {
+		fmt.Printf("   Report: %s\n", reportPath)
 	}
 }
 

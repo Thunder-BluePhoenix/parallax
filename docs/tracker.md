@@ -1,16 +1,16 @@
 # Parallax — Development Tracker
 
-Last updated: 2026-04-23
+Last updated: 2026-04-23 (Phase 2 complete)
 
 ---
 
 ## Overall Progress
 
 ```
-Phase 1    ███████████████████░  97%  🔄 Near Complete (HTTP/3 + gRPC calls remain)
-Phase 2    █████████████░░░░░░░  65%  🔄 In Progress (proxy/health/loadtest done; CLI + filter + SQLite + mock full remain)
+Phase 1    ███████████████████░  97%  🔄 Near Complete (HTTP/3 + gRPC client calls remain)
+Phase 2    ████████████████████ 100%  ✅ Complete
 Phase 2.5  ░░░░░░░░░░░░░░░░░░░░   0%  🔲 Planned (Git Collaboration + Chat)
-Phase 3    ░░░░░░░░░░░░░░░░░░░░   0%  🔲 Planned
+Phase 3    ██░░░░░░░░░░░░░░░░░░  12%  🔄 Started (AI test gen end-to-end: Go+Rust+UI for Ollama+OpenAI)
 Phase 4    ░░░░░░░░░░░░░░░░░░░░   0%  🔲 Planned
 Phase 5    ░░░░░░░░░░░░░░░░░░░░   0%  🔲 Planned
 ```
@@ -217,7 +217,11 @@ Phase 5    ░░░░░░░░░░░░░░░░░░░░   0%  �
 ### `parallax-cli` (Newman equivalent, Go)
 | Task | Status | Notes |
 |---|---|---|
-| All CLI commands | 🔲 | |
+| `parallax run <collection>` | ✅ Done | Flags: `-e` env, `-g` globals, `-i` iterations, `-d` delay, `-v` verbose, `--data`, `--reporter` |
+| `parallax mock <port>` | ✅ Done | Standalone mock server; no DB persistence in CLI mode |
+| `parallax init` | ✅ Done | Scaffolds `.parallax/` dirs + `default.json` environment |
+| `parallax run --data <csv/json>` | ✅ Done | CSV header row + data rows; JSON array of objects — each row overrides env per iteration |
+| `parallax run --reporter html` | ✅ Done | Self-contained HTML report saved to `.parallax/reports/run-{ts}.html` |
 
 ### Dashboard Mode
 | Task | Status | Notes |
@@ -233,20 +237,20 @@ Phase 5    ░░░░░░░░░░░░░░░░░░░░   0%  �
 | Task | Status | Notes |
 |---|---|---|
 | `start_proxy_stream` / `get_proxy_traffic` / `clear_proxy_traffic` | ✅ Done | Rust ↔ gRPC wired |
-| HTTP proxy server in Go (`localhost:8765`) | ✅ Done | `src-go/proxy/proxy.go` (274 lines) — real HTTP/HTTPS intercept |
-| HTTPS MITM with local CA cert | ✅ Done | `src-go/proxy/ca.go` (99 lines) — CA cert generation |
-| Traffic filter by domain/method/status | 🔲 | |
-| Export as HAR | 🔲 | |
+| HTTP proxy server in Go | ✅ Done | `src-go/proxy/proxy.go` (428 lines) — real HTTP/HTTPS intercept; capped 5000 entries |
+| HTTPS MITM with local CA cert | ✅ Done | `src-go/proxy/ca.go` (100 lines) — CA cert gen; `/parallax/ca.crt` download endpoint |
+| Traffic filter by domain/method/status | ✅ Done | Go `SetFilter()` + gRPC + Rust `set_proxy_filter` + UI domain include/exclude fields |
+| Export as HAR | ✅ Done | Client-side HAR 1.2 + Go `ExportHAR()`; "Export HAR" button in LiveTrafficPanel |
 | Replay captured request | 🔲 | |
 
 ### Health Monitor (Rust commands wired to gRPC)
 | Task | Status | Notes |
 |---|---|---|
-| `start_health_stream` / `add/remove_health_target` / `get_health_statuses` | ✅ Done | Rust ↔ gRPC wired |
-| Goroutine-per-service health checks in Go | ✅ Done | `src-go/health/health.go` (180 lines) — goroutine-per-service |
-| SQLite uptime history | 🔲 | |
-| Desktop notifications on status change | 🔲 | |
-| Alert webhook on failure | 🔲 | |
+| `start_health_stream` / `add/remove_health_target` / `get_health_statuses` | ✅ Done | Rust ↔ gRPC wired; `alert_webhook` field passed through |
+| Goroutine-per-service health checks in Go | ✅ Done | `src-go/health/health.go` (194 lines) — goroutine-per-service |
+| SQLite uptime history | ✅ Done | `storage.go` `SaveHealthStatus()` called on every check |
+| Desktop notifications on status change | ✅ Done | `HealthHeatmapPanel.svelte` — `sendNotification` on down/restored transitions |
+| Alert webhook on failure | ✅ Done | `health.go` fires POST to `AlertWebhook` when status transitions to "down" |
 
 ### Load Tester
 | Task | Status | Notes |
@@ -267,21 +271,21 @@ Phase 5    ░░░░░░░░░░░░░░░░░░░░   0%  �
 ### Mock Server
 | Task | Status | Notes |
 |---|---|---|
-| Go mock server — start/stop + AddRule/RemoveRule | ✅ Done | `src-go/mock/mock.go` (86 lines); Rust commands in `mock.rs` |
-| Path parameters (`:id`) and wildcards | 🔲 | |
-| Response templating with request data | 🔲 | |
-| Configurable response delay | 🔲 | |
-| Record mode (proxy + auto-generate rules) | 🔲 | |
-| `parallax-cli mock` command | 🔲 | |
+| Go mock server — start/stop + AddRule/RemoveRule/ListRules | ✅ Done | `src-go/mock/mock.go` (210 lines); Rust `mock.rs` + SQLite persistence |
+| Path parameters (`:id`) and wildcards (`*`) | ✅ Done | `mock.go` `matchPath()` — `:param` captured into `{{.Params.id}}` |
+| Response templating with request data | ✅ Done | `mock.go` `renderBody()` — Go `text/template`; `{{.Params.*}}` and `{{.Query.*}}` |
+| Configurable response delay | ✅ Done | `x-parallax-delay-ms` header convention; UI delay field in MockServerPanel; Go sleeps before responding |
+| Record mode (proxy + auto-generate rules) | 🔲 | Deferred — complex; not blocking Phase 2.5 |
+| `parallax-cli mock` command | ✅ Done | `main.go` `handleCLIMock` — standalone mock server on any port |
 
 ### gRPC Streaming Bridge
 | Task | Status | Notes |
 |---|---|---|
 | `WatchTraffic` stream | ✅ Done | Rust command → gRPC |
 | `WatchHealth` stream (`WatchStatuses`) | ✅ Done | Rust command → gRPC |
-| `StreamLoadTest` (`RunLoadTest`) stream | ✅ Done | `grpc/server.go` line 208 |
-| `WatchFiles` stream | 🔲 | |
-| `StreamRunner` stream | 🔲 | |
+| `StreamLoadTest` (`RunLoadTest`) stream | ✅ Done | `grpc/server.go` — full progress + result |
+| `WatchFiles` stream (`WatchWorkspace`) | ✅ Done | `watcher.go` fsnotify + gRPC + Rust `watch_workspace`/`unwatch_workspace` + `workspace_file_changed` event |
+| `StreamRunner` stream (`RunCollection`) | ✅ Done | `server.go` loads collection from path, resolves env, streams per-request events via `RunCollectionStream` |
 
 ---
 
@@ -365,23 +369,26 @@ Phase 5    ░░░░░░░░░░░░░░░░░░░░   0%  �
 
 ## Phase 3 — AI Integration & MCP Server
 
-> Not started.
+> AI test generator shipped early (Go+Rust+UI). MCP server, remaining AI features, and doc generator not yet started.
 
 ### BYO-AI Providers
-| Task | Status |
-|---|---|
-| OpenAI / Anthropic / Ollama / Gemini / Custom providers | 🔲 |
-| AI settings UI + `ai.json` config | 🔲 |
-| Air-gap mode | 🔲 |
+| Task | Status | Notes |
+|---|---|---|
+| OpenAI provider | ✅ Done | `ai.go` `callOpenAI()` — JSON mode; chat completions |
+| Ollama provider | ✅ Done | `ai.go` `callOllama()` — local model, JSON format |
+| AI settings UI + `ai.svelte.ts` store | ✅ Done | `AISettingsPanel.svelte` (129 lines) + `ai.svelte.ts` store |
+| Rust `ai_generate_tests` Tauri command | ✅ Done | `ai.rs` — passes config + request context to Go gRPC |
+| Anthropic / Gemini / Custom providers | 🔲 | |
+| Air-gap mode (Ollama-only) | 🔲 | |
 
 ### AI Features
-| Task | Status |
-|---|---|
-| AI test generator | 🔲 |
-| AI request repair (4xx/5xx) | 🔲 |
-| AI collection creator | 🔲 |
-| AI script assistant | 🔲 |
-| AI env variable suggestion | 🔲 |
+| Task | Status | Notes |
+|---|---|---|
+| AI test generator | ✅ Done | Go `ai.go` → OpenAI / Ollama; returns `js` + `yaml` assertions |
+| AI request repair (4xx/5xx) | 🔲 | |
+| AI collection creator | 🔲 | |
+| AI script assistant | 🔲 | |
+| AI env variable suggestion | 🔲 | |
 
 ### MCP Server
 | Task | Status |
@@ -490,12 +497,17 @@ Phase 5    ░░░░░░░░░░░░░░░░░░░░   0%  �
 | Blocker | Impact | Priority |
 |---|---|---|
 | ~~Cookie manager UI missing~~ | ~~Cookies work in reqwest but not inspectable~~ | ✅ Resolved |
-| ~~Go-side proxy HTTP server not implemented~~ | ~~`LiveTrafficPanel` Rust commands exist but Go not wired~~ | ✅ Resolved — `proxy.go` + `ca.go` implemented |
-| ~~Go-side health goroutines not implemented~~ | ~~`HealthHeatmapPanel` Rust commands exist but Go not wired~~ | ✅ Resolved — `health.go` goroutines implemented |
+| ~~Go-side proxy HTTP server not implemented~~ | ~~`LiveTrafficPanel` Rust commands exist but Go not wired~~ | ✅ Resolved — `proxy.go` + `ca.go` |
+| ~~Go-side health goroutines not implemented~~ | ~~`HealthHeatmapPanel` Rust commands exist but Go not wired~~ | ✅ Resolved — `health.go` goroutines |
 | ~~GraphQL schema introspection missing~~ | ~~GraphQL body works; no schema browser~~ | ✅ Resolved |
-| `parallax-cli` not started | No Newman equivalent for CI/CD pipelines | 🟡 P1 |
-| Go runner missing template engine + test scripts | CLI runner executes requests but can't resolve `{{vars}}` or run `pm.test()` | 🟡 P1 |
-| Mock server path params + templating not implemented | Basic rules only; `:id` routes don't work | 🟢 P2 |
+| ~~`parallax-cli` not started~~ | ~~No Newman equivalent for CI/CD pipelines~~ | ✅ Resolved — `run` / `mock` / `init` subcommands done |
+| ~~Go runner missing template engine + test scripts~~ | ~~CLI runner can't resolve `{{vars}}` or run `pm.test()`~~ | ✅ Resolved — `runner.go` has `resolve()` + `pm.test()` via goja |
+| ~~Mock server path params + templating not implemented~~ | ~~Basic rules only; `:id` routes don't work~~ | ✅ Resolved — `matchPath()` + `renderBody()` done |
+| ~~Traffic filter + HAR export not wired to Tauri~~ | ~~Go+gRPC done; need Rust commands + UI~~ | ✅ Resolved — `set_proxy_filter` + domain filter UI |
+| ~~`WatchFiles` gRPC stream not wired to Tauri~~ | ~~need Rust `watch_workspace` command~~ | ✅ Resolved — `watcher.rs` done |
+| ~~`StreamRunner` not implemented~~ | ~~`RunCollection` gRPC is a stub~~ | ✅ Resolved — full streaming runner |
+| ~~`parallax-cli --reporter html` and `--data` flags~~ | ~~CLI run works but no HTML report~~ | ✅ Resolved — both done |
+| Mock record mode | Would auto-generate rules from proxy traffic | 🟢 P2 — deferred to post-2.5 |
 | Sidebar drag-and-drop reordering | Collections are static order | 🟢 P2 |
 
 ---
@@ -523,6 +535,12 @@ Phase 5    ░░░░░░░░░░░░░░░░░░░░   0%  �
 | 2026-04-23 | Git-relay fallback stores chat as `.parallax/chat/*.jsonl` (polled every 15s) | Works cross-internet with zero relay infra |
 | 2026-04-23 | GitHub ID is universal identity (git author, presence, chat, team invites) | Eliminates separate user database; leverages existing GitHub social graph |
 | 2026-04-23 | Team = GitHub repo collaborators; invite by GitHub username via GitHub API | No Parallax user management needed; permissions enforced by GitHub |
+| 2026-04-23 | Go runner uses `goja` JS engine for `pm.test()` in CLI | Same JS runtime as browser-side script runner; consistent test semantics across UI + CLI |
+| 2026-04-23 | Mock response templating uses Go `text/template` not Handlebars | Zero deps; `{{.Params.id}}` and `{{.Query.key}}` pattern is simpler for server-side |
+| 2026-04-23 | AI service in Go sidecar (not Rust) to keep heavy HTTP + JSON parsing off main thread | Go goroutines handle 60s AI timeouts gracefully; Rust stays low-latency for UI |
+| 2026-04-23 | Mock delay stored as `x-parallax-delay-ms` header convention (not a proto field) | Avoids proto regeneration; Go strips it before sending response; UI treats it specially |
+| 2026-04-23 | CLI `--data` uses simple split-on-comma CSV (no quoting support) | Sufficient for typical env-override data files; proper CSV parser can be added later if needed |
+| 2026-04-23 | `RunCollectionStream` accepts `emit func(StreamEvent)` — nil for CLI, channel-based for gRPC | Single implementation serves both UI streaming (gRPC) and CLI text output without duplication |
 
 ---
 

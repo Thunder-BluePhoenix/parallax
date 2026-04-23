@@ -21,42 +21,76 @@ type RunStats struct {
 	DurationMs int64
 }
 
+// StreamEvent is emitted per-request and per-test during a collection run.
+type StreamEvent struct {
+	Type       string // request_start | request_end | test_result | summary
+	Name       string
+	StatusCode int
+	DurationMs int64
+	Passed     bool
+	Error      string
+}
+
+const (
+	EventRequestStart = "request_start"
+	EventRequestEnd   = "request_end"
+	EventTestResult   = "test_result"
+	EventSummary      = "summary"
+)
+
+// RunCollection is the synchronous CLI version — no streaming.
 func RunCollection(col models.Collection, env map[string]string) (*RunStats, error) {
+	return RunCollectionStream(col, env, nil)
+}
+
+// RunCollectionStream runs a collection and calls emit() for every event.
+// Pass nil for emit to suppress streaming (CLI text mode).
+func RunCollectionStream(col models.Collection, env map[string]string, emit func(StreamEvent)) (*RunStats, error) {
 	stats := &RunStats{}
 	start := time.Now()
 
-	for _, req := range col.Requests {
-		if err := runRequest(req, env, stats); err != nil {
-			fmt.Printf("Error running %s: %v\n", req.Name, err)
-		}
-	}
-
-	for _, folder := range col.Folders {
-		for _, req := range folder.Requests {
-			if err := runRequest(req, env, stats); err != nil {
+	runGroup := func(reqs []models.CollectionRequest) {
+		for _, req := range reqs {
+			if emit != nil {
+				emit(StreamEvent{Type: EventRequestStart, Name: req.Name})
+			}
+			if err := runRequest(req, env, stats, emit); err != nil {
 				fmt.Printf("Error running %s: %v\n", req.Name, err)
 			}
 		}
 	}
 
+	runGroup(col.Requests)
+	for _, folder := range col.Folders {
+		runGroup(folder.Requests)
+	}
+
 	stats.Total = stats.Passed + stats.Failed
 	stats.DurationMs = time.Since(start).Milliseconds()
+
+	if emit != nil {
+		emit(StreamEvent{
+			Type:       EventSummary,
+			Name:       fmt.Sprintf("passed:%d failed:%d", stats.Passed, stats.Failed),
+			StatusCode: stats.Failed, // 0 = all passed
+			DurationMs: stats.DurationMs,
+			Passed:     stats.Failed == 0,
+		})
+	}
+
 	return stats, nil
 }
 
-func runRequest(req models.CollectionRequest, env map[string]string, stats *RunStats) error {
+func runRequest(req models.CollectionRequest, env map[string]string, stats *RunStats, emit func(StreamEvent)) error {
 	client := &http.Client{Timeout: 30 * time.Second}
 
-// Template engine
 	resolve := func(s string) string {
 		re := regexp.MustCompile(`\{\{([^}]+)\}\}`)
 		return re.ReplaceAllStringFunc(s, func(match string) string {
 			key := strings.TrimSpace(match[2 : len(match)-2])
-			// Check env
 			if val, ok := env[key]; ok {
 				return val
 			}
-			// Check if key is nested e.g. "env.var"
 			parts := strings.Split(key, ".")
 			if len(parts) > 1 {
 				prefix := parts[0]
@@ -71,10 +105,7 @@ func runRequest(req models.CollectionRequest, env map[string]string, stats *RunS
 
 	url := resolve(req.URL)
 
-	// Pre-request script
 	vm := goja.New()
-	
-	// Helper for assertions
 	vm.Set("pm", map[string]interface{}{
 		"environment": map[string]interface{}{
 			"get": func(k string) string { return env[k] },
@@ -82,7 +113,7 @@ func runRequest(req models.CollectionRequest, env map[string]string, stats *RunS
 			"has": func(k string) bool { _, ok := env[k]; return ok },
 		},
 		"globals": map[string]interface{}{
-			"get": func(k string) string { return env["global."+k] }, // Mock globals for now
+			"get": func(k string) string { return env["global."+k] },
 			"set": func(k, v string) { env["global."+k] = v },
 		},
 		"collectionVariables": map[string]interface{}{
@@ -90,7 +121,7 @@ func runRequest(req models.CollectionRequest, env map[string]string, stats *RunS
 			"set": func(k, v string) { env["col."+k] = v },
 		},
 	})
-	
+
 	if req.Scripts != nil && req.Scripts.PreRequest != "" {
 		if _, err := vm.RunString(req.Scripts.PreRequest); err != nil {
 			fmt.Printf("Pre-request script error in %s: %v\n", req.Name, err)
@@ -127,17 +158,19 @@ func runRequest(req models.CollectionRequest, env map[string]string, stats *RunS
 	if err != nil {
 		stats.Failed++
 		fmt.Printf("✗ %s [%s] - %v\n", req.Name, req.Method, err)
+		if emit != nil {
+			emit(StreamEvent{Type: EventRequestEnd, Name: req.Name, Passed: false, Error: err.Error(), DurationMs: duration.Milliseconds()})
+		}
 		return err
 	}
 	defer resp.Body.Close()
 	respBodyBytes, _ := io.ReadAll(resp.Body)
 	respBodyStr := string(respBodyBytes)
 
-	// Test Script
 	var testResults []string
 	var testErrors []string
+
 	if req.Scripts != nil && req.Scripts.Tests != "" {
-		// Define pm.expect helper
 		expectFn := func(val interface{}) interface{} {
 			return map[string]interface{}{
 				"to": map[string]interface{}{
@@ -170,10 +203,8 @@ func runRequest(req models.CollectionRequest, env map[string]string, stats *RunS
 					"include": func(exp interface{}) {
 						s, ok1 := val.(string)
 						e, ok2 := exp.(string)
-						if ok1 && ok2 {
-							if !strings.Contains(s, e) {
-								panic(fmt.Sprintf("expected string to include %s", e))
-							}
+						if ok1 && ok2 && !strings.Contains(s, e) {
+							panic(fmt.Sprintf("expected string to include %s", e))
 						}
 					},
 				},
@@ -182,37 +213,46 @@ func runRequest(req models.CollectionRequest, env map[string]string, stats *RunS
 
 		pmObj := vm.Get("pm").Export().(map[string]interface{})
 		pmObj["response"] = map[string]interface{}{
-			"code": resp.StatusCode,
-			"json": func() interface{} {
-				var data interface{}
-				json.Unmarshal(respBodyBytes, &data)
-				return data
-			},
-			"text": func() string { return respBodyStr },
+			"code":         resp.StatusCode,
+			"json":         func() interface{} { var d interface{}; json.Unmarshal(respBodyBytes, &d); return d },
+			"text":         func() string { return respBodyStr },
 			"responseTime": duration.Milliseconds(),
 		}
 		pmObj["test"] = func(name string, fn func()) {
-			defer func() {
-				if r := recover(); r != nil {
-					testErrors = append(testErrors, fmt.Sprintf("%s: %v", name, r))
-				}
+			var testErr string
+			func() {
+				defer func() {
+					if r := recover(); r != nil {
+						testErr = fmt.Sprintf("%v", r)
+					}
+				}()
+				fn()
 			}()
-			fn()
-			testResults = append(testResults, name)
+			passed := testErr == ""
+			if passed {
+				testResults = append(testResults, name)
+			} else {
+				testErrors = append(testErrors, fmt.Sprintf("%s: %v", name, testErr))
+			}
+			if emit != nil {
+				emit(StreamEvent{Type: EventTestResult, Name: name, Passed: passed, Error: testErr})
+			}
 		}
 		pmObj["expect"] = expectFn
-		
 		vm.Set("pm", pmObj)
 
 		if _, err := vm.RunString(req.Scripts.Tests); err != nil {
-			fmt.Printf("  Script Error: %v\n", err)
-			testErrors = append(testErrors, fmt.Sprintf("Script Error: %v", err))
+			errMsg := fmt.Sprintf("Script Error: %v", err)
+			testErrors = append(testErrors, errMsg)
+			if emit != nil {
+				emit(StreamEvent{Type: EventTestResult, Name: "script", Passed: false, Error: errMsg})
+			}
 		}
 	}
 
-	passed := len(testErrors) == 0
+	overallPassed := len(testErrors) == 0 && resp.StatusCode < 400
 
-	if resp.StatusCode < 400 && passed {
+	if overallPassed {
 		stats.Passed++
 		fmt.Printf("✓ %s [%s] - %d (%dms)\n", req.Name, req.Method, resp.StatusCode, duration.Milliseconds())
 	} else {
@@ -225,6 +265,21 @@ func runRequest(req models.CollectionRequest, env map[string]string, stats *RunS
 	}
 	for _, e := range testErrors {
 		fmt.Printf("  ✗ %s\n", e)
+	}
+
+	if emit != nil {
+		errStr := ""
+		if len(testErrors) > 0 {
+			errStr = strings.Join(testErrors, "; ")
+		}
+		emit(StreamEvent{
+			Type:       EventRequestEnd,
+			Name:       req.Name,
+			StatusCode: resp.StatusCode,
+			DurationMs: duration.Milliseconds(),
+			Passed:     overallPassed,
+			Error:      errStr,
+		})
 	}
 
 	return nil

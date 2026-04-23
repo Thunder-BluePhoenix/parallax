@@ -12,3 +12,4 @@ pub mod health;
 pub mod loadtest;
 pub mod mock;
 pub mod ai;
+pub mod watcher;

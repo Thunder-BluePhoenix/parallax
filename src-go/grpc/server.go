@@ -2,17 +2,24 @@ package grpcworker
 
 import (
 	"context"
+	"encoding/json"
+	"fmt"
 	"log"
 	"net"
+	"os"
+	"strings"
 
+	"github.com/bluephoenix/parallax-worker/ai"
 	"github.com/bluephoenix/parallax-worker/health"
 	"github.com/bluephoenix/parallax-worker/loadtest"
 	"github.com/bluephoenix/parallax-worker/mock"
-	"github.com/bluephoenix/parallax-worker/proxy"
+	"github.com/bluephoenix/parallax-worker/models"
 	pb "github.com/bluephoenix/parallax-worker/proto"
+	"github.com/bluephoenix/parallax-worker/proxy"
+	"github.com/bluephoenix/parallax-worker/runner"
 	"github.com/bluephoenix/parallax-worker/watcher"
-	"github.com/bluephoenix/parallax-worker/ai"
 	"google.golang.org/grpc"
+	"gopkg.in/yaml.v3"
 )
 
 type Server struct {
@@ -389,15 +396,51 @@ func (s *Server) UnwatchWorkspace(ctx context.Context, req *pb.WatchRequest) (*p
 // RunnerService
 // -----------------------------------------------------------------------------
 func (s *Server) RunCollection(req *pb.RunRequest, stream pb.RunnerService_RunCollectionServer) error {
-	// For now, just run and send summary
-	// In the future, we should add hooks to the runner to send real-time events
-	
-	// Mock implementation for now
-	stream.Send(&pb.RunEvent{Type: "request_start", Name: "Initializing..."})
-	
-	// Real implementation would go here...
-	// We'd need to load the collection and environment from the provided paths.
-	
-	stream.Send(&pb.RunEvent{Type: "summary", Name: "Run completed", StatusCode: 200})
+	colData, err := os.ReadFile(req.CollectionPath)
+	if err != nil {
+		return fmt.Errorf("collection not found: %w", err)
+	}
+
+	var col models.Collection
+	if strings.HasSuffix(req.CollectionPath, ".yaml") || strings.HasSuffix(req.CollectionPath, ".yml") {
+		if err := yaml.Unmarshal(colData, &col); err != nil {
+			return fmt.Errorf("parse collection: %w", err)
+		}
+	} else {
+		if err := json.Unmarshal(colData, &col); err != nil {
+			return fmt.Errorf("parse collection: %w", err)
+		}
+	}
+
+	env := make(map[string]string)
+	if req.EnvironmentPath != "" {
+		if envData, err := os.ReadFile(req.EnvironmentPath); err == nil {
+			var envObj struct {
+				Values    []struct{ Key string; Value interface{} } `json:"values"`
+				Variables []struct{ Key string; Value interface{} } `json:"variables"`
+			}
+			json.Unmarshal(envData, &envObj)
+			for _, v := range envObj.Values {
+				env[v.Key] = fmt.Sprintf("%v", v.Value)
+			}
+			for _, v := range envObj.Variables {
+				env[v.Key] = fmt.Sprintf("%v", v.Value)
+			}
+		}
+	}
+
+	emit := func(e runner.StreamEvent) {
+		stream.Send(&pb.RunEvent{ //nolint
+			Type:       e.Type,
+			Name:       e.Name,
+			StatusCode: int32(e.StatusCode),
+			DurationMs: e.DurationMs,
+			Error:      e.Error,
+		})
+	}
+
+	if _, err := runner.RunCollectionStream(col, env, emit); err != nil {
+		return err
+	}
 	return nil
 }

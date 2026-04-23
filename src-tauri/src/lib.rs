@@ -61,10 +61,13 @@ pub fn run() {
             commands::proxy::start_proxy_stream,
             commands::proxy::get_proxy_traffic,
             commands::proxy::clear_proxy_traffic,
+            commands::proxy::set_proxy_filter,
             commands::health::start_health_stream,
             commands::health::add_health_target,
             commands::health::remove_health_target,
             commands::health::get_health_statuses,
+            commands::watcher::watch_workspace,
+            commands::watcher::unwatch_workspace,
             commands::ai::ai_generate_tests,
         ])
         .manage(new_ws_state())

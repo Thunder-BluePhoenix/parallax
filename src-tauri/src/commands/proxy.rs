@@ -3,7 +3,7 @@ use tonic::transport::Channel;
 use std::time::Duration;
 use crate::commands::worker::pb;
 use pb::proxy_service_client::ProxyServiceClient;
-use pb::{GenericRequest, TrafficRequest};
+use pb::{GenericRequest, TrafficRequest, TrafficFilter};
 use serde::Serialize;
 
 #[derive(Serialize, Clone)]
@@ -94,5 +94,28 @@ pub async fn clear_proxy_traffic() -> Result<(), String> {
 
     let mut client = ProxyServiceClient::new(channel);
     client.clear_traffic(tonic::Request::new(GenericRequest {})).await.map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+#[command]
+pub async fn set_proxy_filter(
+    include_domains: Vec<String>,
+    exclude_domains: Vec<String>,
+    only_methods: Vec<String>,
+    min_status: i32,
+) -> Result<(), String> {
+    let channel = Channel::from_static("http://127.0.0.1:50151")
+        .timeout(Duration::from_secs(2))
+        .connect()
+        .await
+        .map_err(|e| e.to_string())?;
+
+    let mut client = ProxyServiceClient::new(channel);
+    client.set_filter(tonic::Request::new(TrafficFilter {
+        include_domains,
+        exclude_domains,
+        only_methods,
+        min_status,
+    })).await.map_err(|e| e.to_string())?;
     Ok(())
 }

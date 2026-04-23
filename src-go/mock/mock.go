@@ -2,13 +2,15 @@ package mock
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"log"
 	"net/http"
+	"strconv"
 	"strings"
 	"sync"
 	"text/template"
-	"encoding/json"
+	"time"
 
 	"github.com/bluephoenix/parallax-worker/storage"
 )
@@ -130,15 +132,22 @@ func (s *Server) handle(w http.ResponseWriter, r *http.Request) {
 
 		matched, params := matchPath(rule.Path, r.URL.Path)
 		if matched {
+			// Apply configured delay before responding
+			if delayStr, ok := rule.Headers["x-parallax-delay-ms"]; ok {
+				if ms, err := strconv.Atoi(delayStr); err == nil && ms > 0 {
+					time.Sleep(time.Duration(ms) * time.Millisecond)
+				}
+			}
 			for k, v := range rule.Headers {
+				if k == "x-parallax-delay-ms" {
+					continue // don't expose internal delay header to callers
+				}
 				w.Header().Set(k, v)
 			}
 			if rule.ContentType != "" {
 				w.Header().Set("Content-Type", rule.ContentType)
 			}
 			w.WriteHeader(rule.StatusCode)
-			
-			// Render template
 			w.Write([]byte(renderBody(rule.Body, params, r)))
 			return
 		}

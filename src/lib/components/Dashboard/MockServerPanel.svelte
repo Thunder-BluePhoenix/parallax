@@ -19,6 +19,7 @@
   let newStatus = $state(200);
   let newBody = $state('{"message": "Hello from Parallax Mock"}');
   let newContentType = $state("application/json");
+  let newDelayMs = $state(0);
 
   async function loadRules() {
     try {
@@ -30,6 +31,8 @@
 
   async function addRule() {
     const id = "mock-" + Date.now();
+    const headers: Record<string, string> = {};
+    if (newDelayMs > 0) headers["x-parallax-delay-ms"] = String(newDelayMs);
     try {
       await invoke("add_mock_rule", {
         id,
@@ -37,16 +40,16 @@
         method: newMethod,
         statusCode: newStatus,
         body: newBody,
-        headers: {},
+        headers,
         contentType: newContentType
       });
       rules.push({
         id, path: newPath, method: newMethod, status_code: newStatus,
-        body: newBody, headers: {}, content_type: newContentType
+        body: newBody, headers, content_type: newContentType
       });
-      // Reset form
       newPath = "/";
       newBody = '{"message": "success"}';
+      newDelayMs = 0;
     } catch (e) {
       console.error("Failed to add mock rule:", e);
     }
@@ -105,6 +108,10 @@
         <label for="mock-content-type">Content Type</label>
         <input id="mock-content-type" type="text" class="form-input" bind:value={newContentType} />
       </div>
+      <div class="config-field" style="flex: 0 0 120px;">
+        <label for="mock-delay">Delay (ms)</label>
+        <input id="mock-delay" type="number" min="0" class="form-input" bind:value={newDelayMs} placeholder="0" />
+      </div>
       <button class="btn-primary" onclick={addRule}>Create Mock Endpoint</button>
     </div>
   </div>
@@ -122,6 +129,9 @@
             </div>
             <div class="rule-actions">
               <span class="status-badge">{rule.status_code}</span>
+              {#if rule.headers["x-parallax-delay-ms"]}
+                <span class="delay-badge">{rule.headers["x-parallax-delay-ms"]}ms</span>
+              {/if}
               <button class="btn-icon-remove" onclick={() => removeRule(rule.id)}>×</button>
             </div>
           </div>
@@ -208,6 +218,7 @@
 
   .rule-actions { display: flex; align-items: center; gap: 12px; }
   .status-badge { font-size: 11px; font-family: var(--font-mono); font-weight: 700; color: var(--text-secondary); }
+  .delay-badge { font-size: 10px; font-family: var(--font-mono); color: var(--text-muted); background: var(--bg-elevated); border: 1px solid var(--border-default); border-radius: 4px; padding: 1px 5px; }
   
   .btn-icon-remove {
     background: transparent; border: none; color: var(--text-muted);

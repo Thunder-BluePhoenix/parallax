@@ -65,6 +65,7 @@ pub fn run() {
             commands::health::add_health_target,
             commands::health::remove_health_target,
             commands::health::get_health_statuses,
+            commands::ai::ai_generate_tests,
         ])
         .manage(new_ws_state())
         .manage(new_sse_state())

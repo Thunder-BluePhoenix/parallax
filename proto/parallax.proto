@@ -69,6 +69,7 @@ message ServiceTarget {
   string url = 3;
   int32 interval_sec = 4;
   int32 timeout_ms = 5;
+  string alert_webhook = 6;
 }
 
 message ServiceStatus {
@@ -112,6 +113,14 @@ service ProxyService {
   rpc GetTraffic(TrafficRequest) returns (TrafficList);
   rpc WatchTraffic(GenericRequest) returns (stream TrafficEntry);
   rpc ClearTraffic(GenericRequest) returns (GenericResponse);
+  rpc SetFilter(TrafficFilter) returns (GenericResponse);
+}
+
+message TrafficFilter {
+  repeated string include_domains = 1;
+  repeated string exclude_domains = 2;
+  repeated string only_methods = 3;
+  int32 min_status = 4;
 }
 
 message TrafficRequest {
@@ -158,6 +167,51 @@ message MockRule {
 
 message MockRuleList {
   repeated MockRule rules = 1;
+}
+
+// =============================================================================
+// AI Service
+// =============================================================================
+service AIService {
+  rpc GenerateTests(AITestRequest) returns (AITestResponse);
+}
+
+message AITestRequest {
+  string request_id = 1;
+  string method = 2;
+  string url = 3;
+  string response_body = 4;
+  int32 response_status = 5;
+  map<string, string> response_headers = 6;
+  string model = 7;
+  string provider = 8;
+  string api_key = 9;
+  string base_url = 10;
+}
+
+message AITestResponse {
+  string tests_js = 1;
+  string tests_yaml = 2;
+}
+
+// =============================================================================
+// Runner Service
+// =============================================================================
+service RunnerService {
+  rpc RunCollection(RunRequest) returns (stream RunEvent);
+}
+
+message RunRequest {
+  string collection_path = 1;
+  string environment_path = 2;
+}
+
+message RunEvent {
+  string type = 1; // "request_start", "request_end", "test_result", "summary"
+  string name = 2;
+  int32 status_code = 3;
+  int64 duration_ms = 4;
+  string error = 5;
 }
 
 // =============================================================================

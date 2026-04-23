@@ -1,6 +1,8 @@
 <script lang="ts">
   import { responseState, responseHistory, testResults, visualizerData } from "../../stores/app.svelte";
   import VisualizerIframe from "./VisualizerIframe.svelte";
+  import { generateTests, aiStatus } from "../../stores/ai.svelte";
+  import { currentRequestId } from "../../stores/app.svelte";
 
   let viewMode   = $state<"pretty" | "raw" | "headers" | "cookies" | "tests" | "history" | "visualize">("pretty");
   let historyIdx = $state(0);
@@ -25,6 +27,17 @@
     if (!responseState.response?.body?.json) return [];
     return prettyJson(responseState.response.body.json).split("\n");
   });
+
+  async function handleGenerateTests() {
+    if (!responseState.response) return;
+    try {
+      const result = await generateTests(currentRequestId.value, responseState.response);
+      console.log("AI Tests:", result);
+      alert("AI tests generated! (Auto-applying to editor is next)");
+    } catch (e) {
+      console.error(e);
+    }
+  }
 </script>
 
 <div class="response-panel pane">
@@ -172,6 +185,22 @@
 
       {:else if viewMode === "tests"}
         <div class="tests-viewer">
+          <div class="tests-toolbar">
+            <button class="btn-ai-tests" disabled={aiStatus.busy} onclick={handleGenerateTests}>
+              {#if aiStatus.busy}
+                <span class="spinner-small"></span> Generating...
+              {:else}
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
+                </svg>
+                Generate Tests with AI
+              {/if}
+            </button>
+            {#if aiStatus.lastError}
+              <span class="ai-error">{aiStatus.lastError}</span>
+            {/if}
+          </div>
+
           {#if !testResults.ran}
             <p class="tests-empty">No tests ran — add scripts in the Tests tab and send the request.</p>
           {:else if testResults.results.length === 0}
@@ -500,6 +529,18 @@
     opacity: 0.8;
     word-break: break-all;
   }
+
+  .tests-toolbar { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }
+  .btn-ai-tests {
+    display: flex; align-items: center; gap: 8px; background: var(--bg-elevated); border: 1px solid var(--border-default);
+    color: var(--accent-primary); font-size: 11px; font-weight: 600; padding: 4px 10px; border-radius: 4px; cursor: pointer;
+    transition: var(--transition-fast);
+  }
+  .btn-ai-tests:hover:not(:disabled) { background: var(--accent-primary-dim); border-color: var(--accent-primary); }
+  .btn-ai-tests:disabled { opacity: 0.5; cursor: not-allowed; }
+
+  .ai-error { color: var(--color-error); font-size: 10px; }
+  .spinner-small { width: 10px; height: 10px; border: 1px solid var(--accent-primary); border-top-color: transparent; border-radius: 50%; animation: spin 0.8s linear infinite; }
 
   /* History panel */
   .history-viewer { display: flex; flex-direction: column; height: 100%; }

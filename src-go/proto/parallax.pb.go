@@ -328,6 +328,7 @@ type ServiceTarget struct {
 	Url           string                 `protobuf:"bytes,3,opt,name=url,proto3" json:"url,omitempty"`
 	IntervalSec   int32                  `protobuf:"varint,4,opt,name=interval_sec,json=intervalSec,proto3" json:"interval_sec,omitempty"`
 	TimeoutMs     int32                  `protobuf:"varint,5,opt,name=timeout_ms,json=timeoutMs,proto3" json:"timeout_ms,omitempty"`
+	AlertWebhook  string                 `protobuf:"bytes,6,opt,name=alert_webhook,json=alertWebhook,proto3" json:"alert_webhook,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -395,6 +396,13 @@ func (x *ServiceTarget) GetTimeoutMs() int32 {
 		return x.TimeoutMs
 	}
 	return 0
+}
+
+func (x *ServiceTarget) GetAlertWebhook() string {
+	if x != nil {
+		return x.AlertWebhook
+	}
+	return ""
 }
 
 type ServiceStatus struct {
@@ -653,6 +661,74 @@ func (x *FileChangeEvent) GetIsEnvironment() bool {
 	return false
 }
 
+type TrafficFilter struct {
+	state          protoimpl.MessageState `protogen:"open.v1"`
+	IncludeDomains []string               `protobuf:"bytes,1,rep,name=include_domains,json=includeDomains,proto3" json:"include_domains,omitempty"`
+	ExcludeDomains []string               `protobuf:"bytes,2,rep,name=exclude_domains,json=excludeDomains,proto3" json:"exclude_domains,omitempty"`
+	OnlyMethods    []string               `protobuf:"bytes,3,rep,name=only_methods,json=onlyMethods,proto3" json:"only_methods,omitempty"`
+	MinStatus      int32                  `protobuf:"varint,4,opt,name=min_status,json=minStatus,proto3" json:"min_status,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
+}
+
+func (x *TrafficFilter) Reset() {
+	*x = TrafficFilter{}
+	mi := &file_parallax_proto_msgTypes[8]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *TrafficFilter) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*TrafficFilter) ProtoMessage() {}
+
+func (x *TrafficFilter) ProtoReflect() protoreflect.Message {
+	mi := &file_parallax_proto_msgTypes[8]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use TrafficFilter.ProtoReflect.Descriptor instead.
+func (*TrafficFilter) Descriptor() ([]byte, []int) {
+	return file_parallax_proto_rawDescGZIP(), []int{8}
+}
+
+func (x *TrafficFilter) GetIncludeDomains() []string {
+	if x != nil {
+		return x.IncludeDomains
+	}
+	return nil
+}
+
+func (x *TrafficFilter) GetExcludeDomains() []string {
+	if x != nil {
+		return x.ExcludeDomains
+	}
+	return nil
+}
+
+func (x *TrafficFilter) GetOnlyMethods() []string {
+	if x != nil {
+		return x.OnlyMethods
+	}
+	return nil
+}
+
+func (x *TrafficFilter) GetMinStatus() int32 {
+	if x != nil {
+		return x.MinStatus
+	}
+	return 0
+}
+
 type TrafficRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Limit         int32                  `protobuf:"varint,1,opt,name=limit,proto3" json:"limit,omitempty"`
@@ -662,7 +738,7 @@ type TrafficRequest struct {
 
 func (x *TrafficRequest) Reset() {
 	*x = TrafficRequest{}
-	mi := &file_parallax_proto_msgTypes[8]
+	mi := &file_parallax_proto_msgTypes[9]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -674,7 +750,7 @@ func (x *TrafficRequest) String() string {
 func (*TrafficRequest) ProtoMessage() {}
 
 func (x *TrafficRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_parallax_proto_msgTypes[8]
+	mi := &file_parallax_proto_msgTypes[9]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -687,7 +763,7 @@ func (x *TrafficRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use TrafficRequest.ProtoReflect.Descriptor instead.
 func (*TrafficRequest) Descriptor() ([]byte, []int) {
-	return file_parallax_proto_rawDescGZIP(), []int{8}
+	return file_parallax_proto_rawDescGZIP(), []int{9}
 }
 
 func (x *TrafficRequest) GetLimit() int32 {
@@ -717,7 +793,7 @@ type TrafficEntry struct {
 
 func (x *TrafficEntry) Reset() {
 	*x = TrafficEntry{}
-	mi := &file_parallax_proto_msgTypes[9]
+	mi := &file_parallax_proto_msgTypes[10]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -729,7 +805,7 @@ func (x *TrafficEntry) String() string {
 func (*TrafficEntry) ProtoMessage() {}
 
 func (x *TrafficEntry) ProtoReflect() protoreflect.Message {
-	mi := &file_parallax_proto_msgTypes[9]
+	mi := &file_parallax_proto_msgTypes[10]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -742,7 +818,7 @@ func (x *TrafficEntry) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use TrafficEntry.ProtoReflect.Descriptor instead.
 func (*TrafficEntry) Descriptor() ([]byte, []int) {
-	return file_parallax_proto_rawDescGZIP(), []int{9}
+	return file_parallax_proto_rawDescGZIP(), []int{10}
 }
 
 func (x *TrafficEntry) GetId() string {
@@ -838,7 +914,7 @@ type TrafficList struct {
 
 func (x *TrafficList) Reset() {
 	*x = TrafficList{}
-	mi := &file_parallax_proto_msgTypes[10]
+	mi := &file_parallax_proto_msgTypes[11]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -850,7 +926,7 @@ func (x *TrafficList) String() string {
 func (*TrafficList) ProtoMessage() {}
 
 func (x *TrafficList) ProtoReflect() protoreflect.Message {
-	mi := &file_parallax_proto_msgTypes[10]
+	mi := &file_parallax_proto_msgTypes[11]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -863,7 +939,7 @@ func (x *TrafficList) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use TrafficList.ProtoReflect.Descriptor instead.
 func (*TrafficList) Descriptor() ([]byte, []int) {
-	return file_parallax_proto_rawDescGZIP(), []int{10}
+	return file_parallax_proto_rawDescGZIP(), []int{11}
 }
 
 func (x *TrafficList) GetEntries() []*TrafficEntry {
@@ -888,7 +964,7 @@ type MockRule struct {
 
 func (x *MockRule) Reset() {
 	*x = MockRule{}
-	mi := &file_parallax_proto_msgTypes[11]
+	mi := &file_parallax_proto_msgTypes[12]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -900,7 +976,7 @@ func (x *MockRule) String() string {
 func (*MockRule) ProtoMessage() {}
 
 func (x *MockRule) ProtoReflect() protoreflect.Message {
-	mi := &file_parallax_proto_msgTypes[11]
+	mi := &file_parallax_proto_msgTypes[12]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -913,7 +989,7 @@ func (x *MockRule) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use MockRule.ProtoReflect.Descriptor instead.
 func (*MockRule) Descriptor() ([]byte, []int) {
-	return file_parallax_proto_rawDescGZIP(), []int{11}
+	return file_parallax_proto_rawDescGZIP(), []int{12}
 }
 
 func (x *MockRule) GetId() string {
@@ -974,7 +1050,7 @@ type MockRuleList struct {
 
 func (x *MockRuleList) Reset() {
 	*x = MockRuleList{}
-	mi := &file_parallax_proto_msgTypes[12]
+	mi := &file_parallax_proto_msgTypes[13]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -986,7 +1062,7 @@ func (x *MockRuleList) String() string {
 func (*MockRuleList) ProtoMessage() {}
 
 func (x *MockRuleList) ProtoReflect() protoreflect.Message {
-	mi := &file_parallax_proto_msgTypes[12]
+	mi := &file_parallax_proto_msgTypes[13]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -999,7 +1075,7 @@ func (x *MockRuleList) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use MockRuleList.ProtoReflect.Descriptor instead.
 func (*MockRuleList) Descriptor() ([]byte, []int) {
-	return file_parallax_proto_rawDescGZIP(), []int{12}
+	return file_parallax_proto_rawDescGZIP(), []int{13}
 }
 
 func (x *MockRuleList) GetRules() []*MockRule {
@@ -1007,6 +1083,302 @@ func (x *MockRuleList) GetRules() []*MockRule {
 		return x.Rules
 	}
 	return nil
+}
+
+type AITestRequest struct {
+	state           protoimpl.MessageState `protogen:"open.v1"`
+	RequestId       string                 `protobuf:"bytes,1,opt,name=request_id,json=requestId,proto3" json:"request_id,omitempty"`
+	Method          string                 `protobuf:"bytes,2,opt,name=method,proto3" json:"method,omitempty"`
+	Url             string                 `protobuf:"bytes,3,opt,name=url,proto3" json:"url,omitempty"`
+	ResponseBody    string                 `protobuf:"bytes,4,opt,name=response_body,json=responseBody,proto3" json:"response_body,omitempty"`
+	ResponseStatus  int32                  `protobuf:"varint,5,opt,name=response_status,json=responseStatus,proto3" json:"response_status,omitempty"`
+	ResponseHeaders map[string]string      `protobuf:"bytes,6,rep,name=response_headers,json=responseHeaders,proto3" json:"response_headers,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
+	Model           string                 `protobuf:"bytes,7,opt,name=model,proto3" json:"model,omitempty"`
+	Provider        string                 `protobuf:"bytes,8,opt,name=provider,proto3" json:"provider,omitempty"`
+	ApiKey          string                 `protobuf:"bytes,9,opt,name=api_key,json=apiKey,proto3" json:"api_key,omitempty"`
+	BaseUrl         string                 `protobuf:"bytes,10,opt,name=base_url,json=baseUrl,proto3" json:"base_url,omitempty"`
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
+}
+
+func (x *AITestRequest) Reset() {
+	*x = AITestRequest{}
+	mi := &file_parallax_proto_msgTypes[14]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AITestRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AITestRequest) ProtoMessage() {}
+
+func (x *AITestRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_parallax_proto_msgTypes[14]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AITestRequest.ProtoReflect.Descriptor instead.
+func (*AITestRequest) Descriptor() ([]byte, []int) {
+	return file_parallax_proto_rawDescGZIP(), []int{14}
+}
+
+func (x *AITestRequest) GetRequestId() string {
+	if x != nil {
+		return x.RequestId
+	}
+	return ""
+}
+
+func (x *AITestRequest) GetMethod() string {
+	if x != nil {
+		return x.Method
+	}
+	return ""
+}
+
+func (x *AITestRequest) GetUrl() string {
+	if x != nil {
+		return x.Url
+	}
+	return ""
+}
+
+func (x *AITestRequest) GetResponseBody() string {
+	if x != nil {
+		return x.ResponseBody
+	}
+	return ""
+}
+
+func (x *AITestRequest) GetResponseStatus() int32 {
+	if x != nil {
+		return x.ResponseStatus
+	}
+	return 0
+}
+
+func (x *AITestRequest) GetResponseHeaders() map[string]string {
+	if x != nil {
+		return x.ResponseHeaders
+	}
+	return nil
+}
+
+func (x *AITestRequest) GetModel() string {
+	if x != nil {
+		return x.Model
+	}
+	return ""
+}
+
+func (x *AITestRequest) GetProvider() string {
+	if x != nil {
+		return x.Provider
+	}
+	return ""
+}
+
+func (x *AITestRequest) GetApiKey() string {
+	if x != nil {
+		return x.ApiKey
+	}
+	return ""
+}
+
+func (x *AITestRequest) GetBaseUrl() string {
+	if x != nil {
+		return x.BaseUrl
+	}
+	return ""
+}
+
+type AITestResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	TestsJs       string                 `protobuf:"bytes,1,opt,name=tests_js,json=testsJs,proto3" json:"tests_js,omitempty"`
+	TestsYaml     string                 `protobuf:"bytes,2,opt,name=tests_yaml,json=testsYaml,proto3" json:"tests_yaml,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AITestResponse) Reset() {
+	*x = AITestResponse{}
+	mi := &file_parallax_proto_msgTypes[15]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AITestResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AITestResponse) ProtoMessage() {}
+
+func (x *AITestResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_parallax_proto_msgTypes[15]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AITestResponse.ProtoReflect.Descriptor instead.
+func (*AITestResponse) Descriptor() ([]byte, []int) {
+	return file_parallax_proto_rawDescGZIP(), []int{15}
+}
+
+func (x *AITestResponse) GetTestsJs() string {
+	if x != nil {
+		return x.TestsJs
+	}
+	return ""
+}
+
+func (x *AITestResponse) GetTestsYaml() string {
+	if x != nil {
+		return x.TestsYaml
+	}
+	return ""
+}
+
+type RunRequest struct {
+	state           protoimpl.MessageState `protogen:"open.v1"`
+	CollectionPath  string                 `protobuf:"bytes,1,opt,name=collection_path,json=collectionPath,proto3" json:"collection_path,omitempty"`
+	EnvironmentPath string                 `protobuf:"bytes,2,opt,name=environment_path,json=environmentPath,proto3" json:"environment_path,omitempty"`
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
+}
+
+func (x *RunRequest) Reset() {
+	*x = RunRequest{}
+	mi := &file_parallax_proto_msgTypes[16]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RunRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RunRequest) ProtoMessage() {}
+
+func (x *RunRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_parallax_proto_msgTypes[16]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RunRequest.ProtoReflect.Descriptor instead.
+func (*RunRequest) Descriptor() ([]byte, []int) {
+	return file_parallax_proto_rawDescGZIP(), []int{16}
+}
+
+func (x *RunRequest) GetCollectionPath() string {
+	if x != nil {
+		return x.CollectionPath
+	}
+	return ""
+}
+
+func (x *RunRequest) GetEnvironmentPath() string {
+	if x != nil {
+		return x.EnvironmentPath
+	}
+	return ""
+}
+
+type RunEvent struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Type          string                 `protobuf:"bytes,1,opt,name=type,proto3" json:"type,omitempty"` // "request_start", "request_end", "test_result", "summary"
+	Name          string                 `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
+	StatusCode    int32                  `protobuf:"varint,3,opt,name=status_code,json=statusCode,proto3" json:"status_code,omitempty"`
+	DurationMs    int64                  `protobuf:"varint,4,opt,name=duration_ms,json=durationMs,proto3" json:"duration_ms,omitempty"`
+	Error         string                 `protobuf:"bytes,5,opt,name=error,proto3" json:"error,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *RunEvent) Reset() {
+	*x = RunEvent{}
+	mi := &file_parallax_proto_msgTypes[17]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RunEvent) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RunEvent) ProtoMessage() {}
+
+func (x *RunEvent) ProtoReflect() protoreflect.Message {
+	mi := &file_parallax_proto_msgTypes[17]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RunEvent.ProtoReflect.Descriptor instead.
+func (*RunEvent) Descriptor() ([]byte, []int) {
+	return file_parallax_proto_rawDescGZIP(), []int{17}
+}
+
+func (x *RunEvent) GetType() string {
+	if x != nil {
+		return x.Type
+	}
+	return ""
+}
+
+func (x *RunEvent) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+func (x *RunEvent) GetStatusCode() int32 {
+	if x != nil {
+		return x.StatusCode
+	}
+	return 0
+}
+
+func (x *RunEvent) GetDurationMs() int64 {
+	if x != nil {
+		return x.DurationMs
+	}
+	return 0
+}
+
+func (x *RunEvent) GetError() string {
+	if x != nil {
+		return x.Error
+	}
+	return ""
 }
 
 // =============================================================================
@@ -1020,7 +1392,7 @@ type GenericRequest struct {
 
 func (x *GenericRequest) Reset() {
 	*x = GenericRequest{}
-	mi := &file_parallax_proto_msgTypes[13]
+	mi := &file_parallax_proto_msgTypes[18]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1032,7 +1404,7 @@ func (x *GenericRequest) String() string {
 func (*GenericRequest) ProtoMessage() {}
 
 func (x *GenericRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_parallax_proto_msgTypes[13]
+	mi := &file_parallax_proto_msgTypes[18]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1045,7 +1417,7 @@ func (x *GenericRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GenericRequest.ProtoReflect.Descriptor instead.
 func (*GenericRequest) Descriptor() ([]byte, []int) {
-	return file_parallax_proto_rawDescGZIP(), []int{13}
+	return file_parallax_proto_rawDescGZIP(), []int{18}
 }
 
 type StopRequest struct {
@@ -1056,7 +1428,7 @@ type StopRequest struct {
 
 func (x *StopRequest) Reset() {
 	*x = StopRequest{}
-	mi := &file_parallax_proto_msgTypes[14]
+	mi := &file_parallax_proto_msgTypes[19]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1068,7 +1440,7 @@ func (x *StopRequest) String() string {
 func (*StopRequest) ProtoMessage() {}
 
 func (x *StopRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_parallax_proto_msgTypes[14]
+	mi := &file_parallax_proto_msgTypes[19]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1081,7 +1453,7 @@ func (x *StopRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use StopRequest.ProtoReflect.Descriptor instead.
 func (*StopRequest) Descriptor() ([]byte, []int) {
-	return file_parallax_proto_rawDescGZIP(), []int{14}
+	return file_parallax_proto_rawDescGZIP(), []int{19}
 }
 
 type GenericResponse struct {
@@ -1094,7 +1466,7 @@ type GenericResponse struct {
 
 func (x *GenericResponse) Reset() {
 	*x = GenericResponse{}
-	mi := &file_parallax_proto_msgTypes[15]
+	mi := &file_parallax_proto_msgTypes[20]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1106,7 +1478,7 @@ func (x *GenericResponse) String() string {
 func (*GenericResponse) ProtoMessage() {}
 
 func (x *GenericResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_parallax_proto_msgTypes[15]
+	mi := &file_parallax_proto_msgTypes[20]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1119,7 +1491,7 @@ func (x *GenericResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GenericResponse.ProtoReflect.Descriptor instead.
 func (*GenericResponse) Descriptor() ([]byte, []int) {
-	return file_parallax_proto_rawDescGZIP(), []int{15}
+	return file_parallax_proto_rawDescGZIP(), []int{20}
 }
 
 func (x *GenericResponse) GetSuccess() bool {
@@ -1145,7 +1517,7 @@ type TargetIDRequest struct {
 
 func (x *TargetIDRequest) Reset() {
 	*x = TargetIDRequest{}
-	mi := &file_parallax_proto_msgTypes[16]
+	mi := &file_parallax_proto_msgTypes[21]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1157,7 +1529,7 @@ func (x *TargetIDRequest) String() string {
 func (*TargetIDRequest) ProtoMessage() {}
 
 func (x *TargetIDRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_parallax_proto_msgTypes[16]
+	mi := &file_parallax_proto_msgTypes[21]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1170,7 +1542,7 @@ func (x *TargetIDRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use TargetIDRequest.ProtoReflect.Descriptor instead.
 func (*TargetIDRequest) Descriptor() ([]byte, []int) {
-	return file_parallax_proto_rawDescGZIP(), []int{16}
+	return file_parallax_proto_rawDescGZIP(), []int{21}
 }
 
 func (x *TargetIDRequest) GetId() string {
@@ -1221,14 +1593,15 @@ const file_parallax_proto_rawDesc = "" +
 	" \x01(\x01R\n" +
 	"reqsPerSec\x12\x16\n" +
 	"\x06errors\x18\v \x03(\tR\x06errors\x12\x1c\n" +
-	"\thistogram\x18\f \x03(\x03R\thistogram\"\x87\x01\n" +
+	"\thistogram\x18\f \x03(\x03R\thistogram\"\xac\x01\n" +
 	"\rServiceTarget\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
 	"\x04name\x18\x02 \x01(\tR\x04name\x12\x10\n" +
 	"\x03url\x18\x03 \x01(\tR\x03url\x12!\n" +
 	"\finterval_sec\x18\x04 \x01(\x05R\vintervalSec\x12\x1d\n" +
 	"\n" +
-	"timeout_ms\x18\x05 \x01(\x05R\ttimeoutMs\"\xdd\x01\n" +
+	"timeout_ms\x18\x05 \x01(\x05R\ttimeoutMs\x12#\n" +
+	"\ralert_webhook\x18\x06 \x01(\tR\falertWebhook\"\xdd\x01\n" +
 	"\rServiceStatus\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
 	"\x04name\x18\x02 \x01(\tR\x04name\x12\x10\n" +
@@ -1248,7 +1621,13 @@ const file_parallax_proto_rawDesc = "" +
 	"\x04path\x18\x01 \x01(\tR\x04path\x12\x1c\n" +
 	"\toperation\x18\x02 \x01(\tR\toperation\x12#\n" +
 	"\ris_collection\x18\x03 \x01(\bR\fisCollection\x12%\n" +
-	"\x0eis_environment\x18\x04 \x01(\bR\risEnvironment\"&\n" +
+	"\x0eis_environment\x18\x04 \x01(\bR\risEnvironment\"\xa3\x01\n" +
+	"\rTrafficFilter\x12'\n" +
+	"\x0finclude_domains\x18\x01 \x03(\tR\x0eincludeDomains\x12'\n" +
+	"\x0fexclude_domains\x18\x02 \x03(\tR\x0eexcludeDomains\x12!\n" +
+	"\fonly_methods\x18\x03 \x03(\tR\vonlyMethods\x12\x1d\n" +
+	"\n" +
+	"min_status\x18\x04 \x01(\x05R\tminStatus\"&\n" +
 	"\x0eTrafficRequest\x12\x14\n" +
 	"\x05limit\x18\x01 \x01(\x05R\x05limit\"\xfa\x04\n" +
 	"\fTrafficEntry\x12\x0e\n" +
@@ -1288,7 +1667,39 @@ const file_parallax_proto_rawDesc = "" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
 	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"8\n" +
 	"\fMockRuleList\x12(\n" +
-	"\x05rules\x18\x01 \x03(\v2\x12.parallax.MockRuleR\x05rules\"\x10\n" +
+	"\x05rules\x18\x01 \x03(\v2\x12.parallax.MockRuleR\x05rules\"\xa9\x03\n" +
+	"\rAITestRequest\x12\x1d\n" +
+	"\n" +
+	"request_id\x18\x01 \x01(\tR\trequestId\x12\x16\n" +
+	"\x06method\x18\x02 \x01(\tR\x06method\x12\x10\n" +
+	"\x03url\x18\x03 \x01(\tR\x03url\x12#\n" +
+	"\rresponse_body\x18\x04 \x01(\tR\fresponseBody\x12'\n" +
+	"\x0fresponse_status\x18\x05 \x01(\x05R\x0eresponseStatus\x12W\n" +
+	"\x10response_headers\x18\x06 \x03(\v2,.parallax.AITestRequest.ResponseHeadersEntryR\x0fresponseHeaders\x12\x14\n" +
+	"\x05model\x18\a \x01(\tR\x05model\x12\x1a\n" +
+	"\bprovider\x18\b \x01(\tR\bprovider\x12\x17\n" +
+	"\aapi_key\x18\t \x01(\tR\x06apiKey\x12\x19\n" +
+	"\bbase_url\x18\n" +
+	" \x01(\tR\abaseUrl\x1aB\n" +
+	"\x14ResponseHeadersEntry\x12\x10\n" +
+	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"J\n" +
+	"\x0eAITestResponse\x12\x19\n" +
+	"\btests_js\x18\x01 \x01(\tR\atestsJs\x12\x1d\n" +
+	"\n" +
+	"tests_yaml\x18\x02 \x01(\tR\ttestsYaml\"`\n" +
+	"\n" +
+	"RunRequest\x12'\n" +
+	"\x0fcollection_path\x18\x01 \x01(\tR\x0ecollectionPath\x12)\n" +
+	"\x10environment_path\x18\x02 \x01(\tR\x0fenvironmentPath\"\x8a\x01\n" +
+	"\bRunEvent\x12\x12\n" +
+	"\x04type\x18\x01 \x01(\tR\x04type\x12\x12\n" +
+	"\x04name\x18\x02 \x01(\tR\x04name\x12\x1f\n" +
+	"\vstatus_code\x18\x03 \x01(\x05R\n" +
+	"statusCode\x12\x1f\n" +
+	"\vduration_ms\x18\x04 \x01(\x03R\n" +
+	"durationMs\x12\x14\n" +
+	"\x05error\x18\x05 \x01(\tR\x05error\"\x10\n" +
 	"\x0eGenericRequest\"\r\n" +
 	"\vStopRequest\"E\n" +
 	"\x0fGenericResponse\x12\x18\n" +
@@ -1309,17 +1720,22 @@ const file_parallax_proto_rawDesc = "" +
 	"\rWatchStatuses\x12\x18.parallax.GenericRequest\x1a\x17.parallax.ServiceStatus0\x012\x9e\x01\n" +
 	"\x0eWatcherService\x12E\n" +
 	"\x0eWatchWorkspace\x12\x16.parallax.WatchRequest\x1a\x19.parallax.FileChangeEvent0\x01\x12E\n" +
-	"\x10UnwatchWorkspace\x12\x16.parallax.WatchRequest\x1a\x19.parallax.GenericResponse2\xd6\x01\n" +
+	"\x10UnwatchWorkspace\x12\x16.parallax.WatchRequest\x1a\x19.parallax.GenericResponse2\x97\x02\n" +
 	"\fProxyService\x12=\n" +
 	"\n" +
 	"GetTraffic\x12\x18.parallax.TrafficRequest\x1a\x15.parallax.TrafficList\x12B\n" +
 	"\fWatchTraffic\x12\x18.parallax.GenericRequest\x1a\x16.parallax.TrafficEntry0\x01\x12C\n" +
-	"\fClearTraffic\x12\x18.parallax.GenericRequest\x1a\x19.parallax.GenericResponse2\xca\x01\n" +
+	"\fClearTraffic\x12\x18.parallax.GenericRequest\x1a\x19.parallax.GenericResponse\x12?\n" +
+	"\tSetFilter\x12\x17.parallax.TrafficFilter\x1a\x19.parallax.GenericResponse2\xca\x01\n" +
 	"\vMockService\x128\n" +
 	"\aAddRule\x12\x12.parallax.MockRule\x1a\x19.parallax.GenericResponse\x12B\n" +
 	"\n" +
 	"RemoveRule\x12\x19.parallax.TargetIDRequest\x1a\x19.parallax.GenericResponse\x12=\n" +
-	"\tListRules\x12\x18.parallax.GenericRequest\x1a\x16.parallax.MockRuleListB.Z,github.com/bluephoenix/parallax-worker/protob\x06proto3"
+	"\tListRules\x12\x18.parallax.GenericRequest\x1a\x16.parallax.MockRuleList2O\n" +
+	"\tAIService\x12B\n" +
+	"\rGenerateTests\x12\x17.parallax.AITestRequest\x1a\x18.parallax.AITestResponse2L\n" +
+	"\rRunnerService\x12;\n" +
+	"\rRunCollection\x12\x14.parallax.RunRequest\x1a\x12.parallax.RunEvent0\x01B.Z,github.com/bluephoenix/parallax-worker/protob\x06proto3"
 
 var (
 	file_parallax_proto_rawDescOnce sync.Once
@@ -1333,7 +1749,7 @@ func file_parallax_proto_rawDescGZIP() []byte {
 	return file_parallax_proto_rawDescData
 }
 
-var file_parallax_proto_msgTypes = make([]protoimpl.MessageInfo, 21)
+var file_parallax_proto_msgTypes = make([]protoimpl.MessageInfo, 27)
 var file_parallax_proto_goTypes = []any{
 	(*LoadTestConfig)(nil),   // 0: parallax.LoadTestConfig
 	(*LoadTestProgress)(nil), // 1: parallax.LoadTestProgress
@@ -1343,66 +1759,79 @@ var file_parallax_proto_goTypes = []any{
 	(*HealthStatusList)(nil), // 5: parallax.HealthStatusList
 	(*WatchRequest)(nil),     // 6: parallax.WatchRequest
 	(*FileChangeEvent)(nil),  // 7: parallax.FileChangeEvent
-	(*TrafficRequest)(nil),   // 8: parallax.TrafficRequest
-	(*TrafficEntry)(nil),     // 9: parallax.TrafficEntry
-	(*TrafficList)(nil),      // 10: parallax.TrafficList
-	(*MockRule)(nil),         // 11: parallax.MockRule
-	(*MockRuleList)(nil),     // 12: parallax.MockRuleList
-	(*GenericRequest)(nil),   // 13: parallax.GenericRequest
-	(*StopRequest)(nil),      // 14: parallax.StopRequest
-	(*GenericResponse)(nil),  // 15: parallax.GenericResponse
-	(*TargetIDRequest)(nil),  // 16: parallax.TargetIDRequest
-	nil,                      // 17: parallax.LoadTestConfig.HeadersEntry
-	nil,                      // 18: parallax.TrafficEntry.RequestHeadersEntry
-	nil,                      // 19: parallax.TrafficEntry.ResponseHeadersEntry
-	nil,                      // 20: parallax.MockRule.HeadersEntry
+	(*TrafficFilter)(nil),    // 8: parallax.TrafficFilter
+	(*TrafficRequest)(nil),   // 9: parallax.TrafficRequest
+	(*TrafficEntry)(nil),     // 10: parallax.TrafficEntry
+	(*TrafficList)(nil),      // 11: parallax.TrafficList
+	(*MockRule)(nil),         // 12: parallax.MockRule
+	(*MockRuleList)(nil),     // 13: parallax.MockRuleList
+	(*AITestRequest)(nil),    // 14: parallax.AITestRequest
+	(*AITestResponse)(nil),   // 15: parallax.AITestResponse
+	(*RunRequest)(nil),       // 16: parallax.RunRequest
+	(*RunEvent)(nil),         // 17: parallax.RunEvent
+	(*GenericRequest)(nil),   // 18: parallax.GenericRequest
+	(*StopRequest)(nil),      // 19: parallax.StopRequest
+	(*GenericResponse)(nil),  // 20: parallax.GenericResponse
+	(*TargetIDRequest)(nil),  // 21: parallax.TargetIDRequest
+	nil,                      // 22: parallax.LoadTestConfig.HeadersEntry
+	nil,                      // 23: parallax.TrafficEntry.RequestHeadersEntry
+	nil,                      // 24: parallax.TrafficEntry.ResponseHeadersEntry
+	nil,                      // 25: parallax.MockRule.HeadersEntry
+	nil,                      // 26: parallax.AITestRequest.ResponseHeadersEntry
 }
 var file_parallax_proto_depIdxs = []int32{
-	17, // 0: parallax.LoadTestConfig.headers:type_name -> parallax.LoadTestConfig.HeadersEntry
+	22, // 0: parallax.LoadTestConfig.headers:type_name -> parallax.LoadTestConfig.HeadersEntry
 	2,  // 1: parallax.LoadTestProgress.result:type_name -> parallax.LoadTestResult
 	4,  // 2: parallax.HealthStatusList.statuses:type_name -> parallax.ServiceStatus
-	18, // 3: parallax.TrafficEntry.request_headers:type_name -> parallax.TrafficEntry.RequestHeadersEntry
-	19, // 4: parallax.TrafficEntry.response_headers:type_name -> parallax.TrafficEntry.ResponseHeadersEntry
-	9,  // 5: parallax.TrafficList.entries:type_name -> parallax.TrafficEntry
-	20, // 6: parallax.MockRule.headers:type_name -> parallax.MockRule.HeadersEntry
-	11, // 7: parallax.MockRuleList.rules:type_name -> parallax.MockRule
-	13, // 8: parallax.WorkerService.Ping:input_type -> parallax.GenericRequest
-	0,  // 9: parallax.LoadTestService.RunLoadTest:input_type -> parallax.LoadTestConfig
-	14, // 10: parallax.LoadTestService.StopLoadTest:input_type -> parallax.StopRequest
-	13, // 11: parallax.LoadTestService.GetLastResult:input_type -> parallax.GenericRequest
-	3,  // 12: parallax.HealthService.AddTarget:input_type -> parallax.ServiceTarget
-	16, // 13: parallax.HealthService.RemoveTarget:input_type -> parallax.TargetIDRequest
-	13, // 14: parallax.HealthService.GetStatuses:input_type -> parallax.GenericRequest
-	13, // 15: parallax.HealthService.WatchStatuses:input_type -> parallax.GenericRequest
-	6,  // 16: parallax.WatcherService.WatchWorkspace:input_type -> parallax.WatchRequest
-	6,  // 17: parallax.WatcherService.UnwatchWorkspace:input_type -> parallax.WatchRequest
-	8,  // 18: parallax.ProxyService.GetTraffic:input_type -> parallax.TrafficRequest
-	13, // 19: parallax.ProxyService.WatchTraffic:input_type -> parallax.GenericRequest
-	13, // 20: parallax.ProxyService.ClearTraffic:input_type -> parallax.GenericRequest
-	11, // 21: parallax.MockService.AddRule:input_type -> parallax.MockRule
-	16, // 22: parallax.MockService.RemoveRule:input_type -> parallax.TargetIDRequest
-	13, // 23: parallax.MockService.ListRules:input_type -> parallax.GenericRequest
-	15, // 24: parallax.WorkerService.Ping:output_type -> parallax.GenericResponse
-	1,  // 25: parallax.LoadTestService.RunLoadTest:output_type -> parallax.LoadTestProgress
-	15, // 26: parallax.LoadTestService.StopLoadTest:output_type -> parallax.GenericResponse
-	2,  // 27: parallax.LoadTestService.GetLastResult:output_type -> parallax.LoadTestResult
-	15, // 28: parallax.HealthService.AddTarget:output_type -> parallax.GenericResponse
-	15, // 29: parallax.HealthService.RemoveTarget:output_type -> parallax.GenericResponse
-	5,  // 30: parallax.HealthService.GetStatuses:output_type -> parallax.HealthStatusList
-	4,  // 31: parallax.HealthService.WatchStatuses:output_type -> parallax.ServiceStatus
-	7,  // 32: parallax.WatcherService.WatchWorkspace:output_type -> parallax.FileChangeEvent
-	15, // 33: parallax.WatcherService.UnwatchWorkspace:output_type -> parallax.GenericResponse
-	10, // 34: parallax.ProxyService.GetTraffic:output_type -> parallax.TrafficList
-	9,  // 35: parallax.ProxyService.WatchTraffic:output_type -> parallax.TrafficEntry
-	15, // 36: parallax.ProxyService.ClearTraffic:output_type -> parallax.GenericResponse
-	15, // 37: parallax.MockService.AddRule:output_type -> parallax.GenericResponse
-	15, // 38: parallax.MockService.RemoveRule:output_type -> parallax.GenericResponse
-	12, // 39: parallax.MockService.ListRules:output_type -> parallax.MockRuleList
-	24, // [24:40] is the sub-list for method output_type
-	8,  // [8:24] is the sub-list for method input_type
-	8,  // [8:8] is the sub-list for extension type_name
-	8,  // [8:8] is the sub-list for extension extendee
-	0,  // [0:8] is the sub-list for field type_name
+	23, // 3: parallax.TrafficEntry.request_headers:type_name -> parallax.TrafficEntry.RequestHeadersEntry
+	24, // 4: parallax.TrafficEntry.response_headers:type_name -> parallax.TrafficEntry.ResponseHeadersEntry
+	10, // 5: parallax.TrafficList.entries:type_name -> parallax.TrafficEntry
+	25, // 6: parallax.MockRule.headers:type_name -> parallax.MockRule.HeadersEntry
+	12, // 7: parallax.MockRuleList.rules:type_name -> parallax.MockRule
+	26, // 8: parallax.AITestRequest.response_headers:type_name -> parallax.AITestRequest.ResponseHeadersEntry
+	18, // 9: parallax.WorkerService.Ping:input_type -> parallax.GenericRequest
+	0,  // 10: parallax.LoadTestService.RunLoadTest:input_type -> parallax.LoadTestConfig
+	19, // 11: parallax.LoadTestService.StopLoadTest:input_type -> parallax.StopRequest
+	18, // 12: parallax.LoadTestService.GetLastResult:input_type -> parallax.GenericRequest
+	3,  // 13: parallax.HealthService.AddTarget:input_type -> parallax.ServiceTarget
+	21, // 14: parallax.HealthService.RemoveTarget:input_type -> parallax.TargetIDRequest
+	18, // 15: parallax.HealthService.GetStatuses:input_type -> parallax.GenericRequest
+	18, // 16: parallax.HealthService.WatchStatuses:input_type -> parallax.GenericRequest
+	6,  // 17: parallax.WatcherService.WatchWorkspace:input_type -> parallax.WatchRequest
+	6,  // 18: parallax.WatcherService.UnwatchWorkspace:input_type -> parallax.WatchRequest
+	9,  // 19: parallax.ProxyService.GetTraffic:input_type -> parallax.TrafficRequest
+	18, // 20: parallax.ProxyService.WatchTraffic:input_type -> parallax.GenericRequest
+	18, // 21: parallax.ProxyService.ClearTraffic:input_type -> parallax.GenericRequest
+	8,  // 22: parallax.ProxyService.SetFilter:input_type -> parallax.TrafficFilter
+	12, // 23: parallax.MockService.AddRule:input_type -> parallax.MockRule
+	21, // 24: parallax.MockService.RemoveRule:input_type -> parallax.TargetIDRequest
+	18, // 25: parallax.MockService.ListRules:input_type -> parallax.GenericRequest
+	14, // 26: parallax.AIService.GenerateTests:input_type -> parallax.AITestRequest
+	16, // 27: parallax.RunnerService.RunCollection:input_type -> parallax.RunRequest
+	20, // 28: parallax.WorkerService.Ping:output_type -> parallax.GenericResponse
+	1,  // 29: parallax.LoadTestService.RunLoadTest:output_type -> parallax.LoadTestProgress
+	20, // 30: parallax.LoadTestService.StopLoadTest:output_type -> parallax.GenericResponse
+	2,  // 31: parallax.LoadTestService.GetLastResult:output_type -> parallax.LoadTestResult
+	20, // 32: parallax.HealthService.AddTarget:output_type -> parallax.GenericResponse
+	20, // 33: parallax.HealthService.RemoveTarget:output_type -> parallax.GenericResponse
+	5,  // 34: parallax.HealthService.GetStatuses:output_type -> parallax.HealthStatusList
+	4,  // 35: parallax.HealthService.WatchStatuses:output_type -> parallax.ServiceStatus
+	7,  // 36: parallax.WatcherService.WatchWorkspace:output_type -> parallax.FileChangeEvent
+	20, // 37: parallax.WatcherService.UnwatchWorkspace:output_type -> parallax.GenericResponse
+	11, // 38: parallax.ProxyService.GetTraffic:output_type -> parallax.TrafficList
+	10, // 39: parallax.ProxyService.WatchTraffic:output_type -> parallax.TrafficEntry
+	20, // 40: parallax.ProxyService.ClearTraffic:output_type -> parallax.GenericResponse
+	20, // 41: parallax.ProxyService.SetFilter:output_type -> parallax.GenericResponse
+	20, // 42: parallax.MockService.AddRule:output_type -> parallax.GenericResponse
+	20, // 43: parallax.MockService.RemoveRule:output_type -> parallax.GenericResponse
+	13, // 44: parallax.MockService.ListRules:output_type -> parallax.MockRuleList
+	15, // 45: parallax.AIService.GenerateTests:output_type -> parallax.AITestResponse
+	17, // 46: parallax.RunnerService.RunCollection:output_type -> parallax.RunEvent
+	28, // [28:47] is the sub-list for method output_type
+	9,  // [9:28] is the sub-list for method input_type
+	9,  // [9:9] is the sub-list for extension type_name
+	9,  // [9:9] is the sub-list for extension extendee
+	0,  // [0:9] is the sub-list for field type_name
 }
 
 func init() { file_parallax_proto_init() }
@@ -1416,9 +1845,9 @@ func file_parallax_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_parallax_proto_rawDesc), len(file_parallax_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   21,
+			NumMessages:   27,
 			NumExtensions: 0,
-			NumServices:   6,
+			NumServices:   8,
 		},
 		GoTypes:           file_parallax_proto_goTypes,
 		DependencyIndexes: file_parallax_proto_depIdxs,

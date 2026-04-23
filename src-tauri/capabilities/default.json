@@ -1,5 +1,5 @@
 {
-  "$schema": "../gen/schemas/desktop-capability.json",
+  "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
   "description": "Default permissions for the Parallax app",
   "windows": ["main"],
@@ -25,7 +25,6 @@
     "fs:allow-read-file",
     "fs:allow-write-file",
     "fs:allow-remove",
-    "fs:allow-rename",
-    "allow-app-commands"
+    "fs:allow-rename"
   ]
 }

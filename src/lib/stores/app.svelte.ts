@@ -66,6 +66,8 @@ export const activeRequest = $state<RequestState>({
   headers: {}, params: {}, bodyType: "none", bodyContent: "", auth: defaultAuth(),
 });
 
+export const currentRequestId = $state<{ value: string }>({ value: activeRequest.id });
+
 // ============================================================
 // Response state
 // ============================================================

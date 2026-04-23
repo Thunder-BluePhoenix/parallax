@@ -11,6 +11,7 @@ import (
 	"github.com/bluephoenix/parallax-worker/proxy"
 	pb "github.com/bluephoenix/parallax-worker/proto"
 	"github.com/bluephoenix/parallax-worker/watcher"
+	"github.com/bluephoenix/parallax-worker/ai"
 	"google.golang.org/grpc"
 )
 
@@ -21,6 +22,8 @@ type Server struct {
 	pb.UnimplementedLoadTestServiceServer
 	pb.UnimplementedMockServiceServer
 	pb.UnimplementedWatcherServiceServer
+	pb.UnimplementedAIServiceServer
+	pb.UnimplementedRunnerServiceServer
 
 	grpcServer  *grpc.Server
 	proxySvc    *proxy.Proxy
@@ -28,9 +31,10 @@ type Server struct {
 	loadtestSvc *loadtest.Service
 	mockSvc     *mock.Server
 	watcherSvc  *watcher.Watcher
+	aiSvc       *ai.AIService
 }
 
-func NewServer(watcherSvc *watcher.Watcher, loadtestSvc *loadtest.Service, healthSvc *health.Monitor, proxySvc *proxy.Proxy, mockSvc *mock.Server) *Server {
+func NewServer(watcherSvc *watcher.Watcher, loadtestSvc *loadtest.Service, healthSvc *health.Monitor, proxySvc *proxy.Proxy, mockSvc *mock.Server, aiSvc *ai.AIService) *Server {
 	return &Server{
 		grpcServer:  grpc.NewServer(),
 		proxySvc:    proxySvc,
@@ -38,6 +42,7 @@ func NewServer(watcherSvc *watcher.Watcher, loadtestSvc *loadtest.Service, healt
 		loadtestSvc: loadtestSvc,
 		mockSvc:     mockSvc,
 		watcherSvc:  watcherSvc,
+		aiSvc:       aiSvc,
 	}
 }
 
@@ -48,6 +53,8 @@ func (s *Server) Serve(lis net.Listener) error {
 	pb.RegisterLoadTestServiceServer(s.grpcServer, s)
 	pb.RegisterMockServiceServer(s.grpcServer, s)
 	pb.RegisterWatcherServiceServer(s.grpcServer, s)
+	pb.RegisterAIServiceServer(s.grpcServer, s)
+	pb.RegisterRunnerServiceServer(s.grpcServer, s)
 	return s.grpcServer.Serve(lis)
 }
 
@@ -95,6 +102,16 @@ func (s *Server) GetTraffic(ctx context.Context, req *pb.TrafficRequest) (*pb.Tr
 
 func (s *Server) ClearTraffic(ctx context.Context, req *pb.GenericRequest) (*pb.GenericResponse, error) {
 	s.proxySvc.ClearTraffic()
+	return &pb.GenericResponse{Success: true}, nil
+}
+
+func (s *Server) SetFilter(ctx context.Context, req *pb.TrafficFilter) (*pb.GenericResponse, error) {
+	s.proxySvc.SetFilter(proxy.TrafficFilter{
+		IncludeDomains: req.IncludeDomains,
+		ExcludeDomains: req.ExcludeDomains,
+		OnlyMethods:    req.OnlyMethods,
+		MinStatus:      int(req.MinStatus),
+	})
 	return &pb.GenericResponse{Success: true}, nil
 }
 
@@ -326,6 +343,14 @@ func (s *Server) RemoveRule(ctx context.Context, req *pb.TargetIDRequest) (*pb.G
 	return &pb.GenericResponse{Success: true}, nil
 }
 
+func (s *Server) GenerateTests(ctx context.Context, req *pb.AITestRequest) (*pb.AITestResponse, error) {
+	js, yaml, err := s.aiSvc.GenerateTests(ctx, req.Model, req.Provider, req.ApiKey, req.BaseUrl, req.Method, req.Url, req.ResponseBody, int(req.ResponseStatus), req.ResponseHeaders)
+	if err != nil {
+		return nil, err
+	}
+	return &pb.AITestResponse{TestsJs: js, TestsYaml: yaml}, nil
+}
+
 // -----------------------------------------------------------------------------
 // WatcherService
 // -----------------------------------------------------------------------------
@@ -358,4 +383,21 @@ func (s *Server) WatchWorkspace(req *pb.WatchRequest, stream pb.WatcherService_W
 func (s *Server) UnwatchWorkspace(ctx context.Context, req *pb.WatchRequest) (*pb.GenericResponse, error) {
 	s.watcherSvc.UnwatchWorkspace(req.WorkspacePath)
 	return &pb.GenericResponse{Success: true}, nil
+}
+
+// -----------------------------------------------------------------------------
+// RunnerService
+// -----------------------------------------------------------------------------
+func (s *Server) RunCollection(req *pb.RunRequest, stream pb.RunnerService_RunCollectionServer) error {
+	// For now, just run and send summary
+	// In the future, we should add hooks to the runner to send real-time events
+	
+	// Mock implementation for now
+	stream.Send(&pb.RunEvent{Type: "request_start", Name: "Initializing..."})
+	
+	// Real implementation would go here...
+	// We'd need to load the collection and environment from the provided paths.
+	
+	stream.Send(&pb.RunEvent{Type: "summary", Name: "Run completed", StatusCode: 200})
+	return nil
 }

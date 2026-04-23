@@ -11,3 +11,4 @@ pub mod proxy;
 pub mod health;
 pub mod loadtest;
 pub mod mock;
+pub mod ai;

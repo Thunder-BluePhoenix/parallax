@@ -3,7 +3,7 @@ fn main() {
         .build_server(false)
         .build_client(true)
         .compile_protos(&["../proto/parallax.proto"], &["../proto"])
-        .unwrap_or_else(|e| panic!("Failed to compile protos {:?}", e));
+        .expect("Failed to compile protos");
 
     tauri_build::build()
 }

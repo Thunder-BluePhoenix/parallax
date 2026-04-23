@@ -3,6 +3,18 @@ use tonic::transport::Channel;
 use crate::commands::worker::pb;
 use pb::mock_service_client::MockServiceClient;
 use pb::MockRule;
+use serde::Serialize;
+
+#[derive(Serialize)]
+pub struct LocalMockRule {
+    pub id: String,
+    pub path: String,
+    pub method: String,
+    pub status_code: i32,
+    pub body: String,
+    pub headers: std::collections::HashMap<String, String>,
+    pub content_type: String,
+}
 
 #[command]
 pub async fn add_mock_rule(
@@ -49,7 +61,7 @@ pub async fn remove_mock_rule(id: String) -> Result<(), String> {
 }
 
 #[command]
-pub async fn list_mock_rules() -> Result<Vec<MockRule>, String> {
+pub async fn list_mock_rules() -> Result<Vec<LocalMockRule>, String> {
     let channel = Channel::from_static("http://127.0.0.1:50151")
         .connect()
         .await
@@ -59,5 +71,15 @@ pub async fn list_mock_rules() -> Result<Vec<MockRule>, String> {
     let request = tonic::Request::new(pb::GenericRequest {});
 
     let response = client.list_rules(request).await.map_err(|e| e.to_string())?;
-    Ok(response.into_inner().rules)
+    let rules = response.into_inner().rules.into_iter().map(|r| LocalMockRule {
+        id: r.id,
+        path: r.path,
+        method: r.method,
+        status_code: r.status_code,
+        body: r.body,
+        headers: r.headers,
+        content_type: r.content_type,
+    }).collect();
+    
+    Ok(rules)
 }

@@ -88,12 +88,12 @@
   <div class="test-config">
     <div class="config-row">
       <div class="config-field flex-1">
-        <label>Target URL</label>
-        <input type="text" class="form-input" bind:value={url} placeholder="https://api.example.com" />
+        <label for="target-url">Target URL</label>
+        <input id="target-url" type="text" class="form-input" bind:value={url} placeholder="https://api.example.com" />
       </div>
       <div class="config-field" style="width: 80px;">
-        <label>Method</label>
-        <select class="form-select" bind:value={method}>
+        <label for="method-select">Method</label>
+        <select id="method-select" class="form-select" bind:value={method}>
           <option>GET</option>
           <option>POST</option>
           <option>PUT</option>
@@ -103,12 +103,12 @@
     </div>
     <div class="config-row">
       <div class="config-field">
-        <label>Concurrency</label>
-        <input type="number" class="form-input" bind:value={concurrent} min="1" max="100" />
+        <label for="concurrency-input">Concurrency</label>
+        <input id="concurrency-input" type="number" class="form-input" bind:value={concurrent} min="1" max="100" />
       </div>
       <div class="config-field">
-        <label>Total Requests</label>
-        <input type="number" class="form-input" bind:value={totalRequests} min="1" max="10000" />
+        <label for="total-requests-input">Total Requests</label>
+        <input id="total-requests-input" type="number" class="form-input" bind:value={totalRequests} min="1" max="10000" />
       </div>
       <button class="btn-action" onclick={startTest} disabled={isRunning}>
         {isRunning ? "Running..." : "Start Load Test"}

@@ -702,6 +702,7 @@ const (
 	ProxyService_GetTraffic_FullMethodName   = "/parallax.ProxyService/GetTraffic"
 	ProxyService_WatchTraffic_FullMethodName = "/parallax.ProxyService/WatchTraffic"
 	ProxyService_ClearTraffic_FullMethodName = "/parallax.ProxyService/ClearTraffic"
+	ProxyService_SetFilter_FullMethodName    = "/parallax.ProxyService/SetFilter"
 )
 
 // ProxyServiceClient is the client API for ProxyService service.
@@ -715,6 +716,7 @@ type ProxyServiceClient interface {
 	GetTraffic(ctx context.Context, in *TrafficRequest, opts ...grpc.CallOption) (*TrafficList, error)
 	WatchTraffic(ctx context.Context, in *GenericRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[TrafficEntry], error)
 	ClearTraffic(ctx context.Context, in *GenericRequest, opts ...grpc.CallOption) (*GenericResponse, error)
+	SetFilter(ctx context.Context, in *TrafficFilter, opts ...grpc.CallOption) (*GenericResponse, error)
 }
 
 type proxyServiceClient struct {
@@ -764,6 +766,16 @@ func (c *proxyServiceClient) ClearTraffic(ctx context.Context, in *GenericReques
 	return out, nil
 }
 
+func (c *proxyServiceClient) SetFilter(ctx context.Context, in *TrafficFilter, opts ...grpc.CallOption) (*GenericResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GenericResponse)
+	err := c.cc.Invoke(ctx, ProxyService_SetFilter_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // ProxyServiceServer is the server API for ProxyService service.
 // All implementations must embed UnimplementedProxyServiceServer
 // for forward compatibility.
@@ -775,6 +787,7 @@ type ProxyServiceServer interface {
 	GetTraffic(context.Context, *TrafficRequest) (*TrafficList, error)
 	WatchTraffic(*GenericRequest, grpc.ServerStreamingServer[TrafficEntry]) error
 	ClearTraffic(context.Context, *GenericRequest) (*GenericResponse, error)
+	SetFilter(context.Context, *TrafficFilter) (*GenericResponse, error)
 	mustEmbedUnimplementedProxyServiceServer()
 }
 
@@ -793,6 +806,9 @@ func (UnimplementedProxyServiceServer) WatchTraffic(*GenericRequest, grpc.Server
 }
 func (UnimplementedProxyServiceServer) ClearTraffic(context.Context, *GenericRequest) (*GenericResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method ClearTraffic not implemented")
+}
+func (UnimplementedProxyServiceServer) SetFilter(context.Context, *TrafficFilter) (*GenericResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method SetFilter not implemented")
 }
 func (UnimplementedProxyServiceServer) mustEmbedUnimplementedProxyServiceServer() {}
 func (UnimplementedProxyServiceServer) testEmbeddedByValue()                      {}
@@ -862,6 +878,24 @@ func _ProxyService_ClearTraffic_Handler(srv interface{}, ctx context.Context, de
 	return interceptor(ctx, in, info, handler)
 }
 
+func _ProxyService_SetFilter_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(TrafficFilter)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ProxyServiceServer).SetFilter(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ProxyService_SetFilter_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ProxyServiceServer).SetFilter(ctx, req.(*TrafficFilter))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // ProxyService_ServiceDesc is the grpc.ServiceDesc for ProxyService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -876,6 +910,10 @@ var ProxyService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "ClearTraffic",
 			Handler:    _ProxyService_ClearTraffic_Handler,
+		},
+		{
+			MethodName: "SetFilter",
+			Handler:    _ProxyService_SetFilter_Handler,
 		},
 	},
 	Streams: []grpc.StreamDesc{
@@ -1071,5 +1109,228 @@ var MockService_ServiceDesc = grpc.ServiceDesc{
 		},
 	},
 	Streams:  []grpc.StreamDesc{},
+	Metadata: "parallax.proto",
+}
+
+const (
+	AIService_GenerateTests_FullMethodName = "/parallax.AIService/GenerateTests"
+)
+
+// AIServiceClient is the client API for AIService service.
+//
+// For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
+//
+// =============================================================================
+// AI Service
+// =============================================================================
+type AIServiceClient interface {
+	GenerateTests(ctx context.Context, in *AITestRequest, opts ...grpc.CallOption) (*AITestResponse, error)
+}
+
+type aIServiceClient struct {
+	cc grpc.ClientConnInterface
+}
+
+func NewAIServiceClient(cc grpc.ClientConnInterface) AIServiceClient {
+	return &aIServiceClient{cc}
+}
+
+func (c *aIServiceClient) GenerateTests(ctx context.Context, in *AITestRequest, opts ...grpc.CallOption) (*AITestResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(AITestResponse)
+	err := c.cc.Invoke(ctx, AIService_GenerateTests_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// AIServiceServer is the server API for AIService service.
+// All implementations must embed UnimplementedAIServiceServer
+// for forward compatibility.
+//
+// =============================================================================
+// AI Service
+// =============================================================================
+type AIServiceServer interface {
+	GenerateTests(context.Context, *AITestRequest) (*AITestResponse, error)
+	mustEmbedUnimplementedAIServiceServer()
+}
+
+// UnimplementedAIServiceServer must be embedded to have
+// forward compatible implementations.
+//
+// NOTE: this should be embedded by value instead of pointer to avoid a nil
+// pointer dereference when methods are called.
+type UnimplementedAIServiceServer struct{}
+
+func (UnimplementedAIServiceServer) GenerateTests(context.Context, *AITestRequest) (*AITestResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method GenerateTests not implemented")
+}
+func (UnimplementedAIServiceServer) mustEmbedUnimplementedAIServiceServer() {}
+func (UnimplementedAIServiceServer) testEmbeddedByValue()                   {}
+
+// UnsafeAIServiceServer may be embedded to opt out of forward compatibility for this service.
+// Use of this interface is not recommended, as added methods to AIServiceServer will
+// result in compilation errors.
+type UnsafeAIServiceServer interface {
+	mustEmbedUnimplementedAIServiceServer()
+}
+
+func RegisterAIServiceServer(s grpc.ServiceRegistrar, srv AIServiceServer) {
+	// If the following call panics, it indicates UnimplementedAIServiceServer was
+	// embedded by pointer and is nil.  This will cause panics if an
+	// unimplemented method is ever invoked, so we test this at initialization
+	// time to prevent it from happening at runtime later due to I/O.
+	if t, ok := srv.(interface{ testEmbeddedByValue() }); ok {
+		t.testEmbeddedByValue()
+	}
+	s.RegisterService(&AIService_ServiceDesc, srv)
+}
+
+func _AIService_GenerateTests_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(AITestRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AIServiceServer).GenerateTests(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: AIService_GenerateTests_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AIServiceServer).GenerateTests(ctx, req.(*AITestRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+// AIService_ServiceDesc is the grpc.ServiceDesc for AIService service.
+// It's only intended for direct use with grpc.RegisterService,
+// and not to be introspected or modified (even as a copy)
+var AIService_ServiceDesc = grpc.ServiceDesc{
+	ServiceName: "parallax.AIService",
+	HandlerType: (*AIServiceServer)(nil),
+	Methods: []grpc.MethodDesc{
+		{
+			MethodName: "GenerateTests",
+			Handler:    _AIService_GenerateTests_Handler,
+		},
+	},
+	Streams:  []grpc.StreamDesc{},
+	Metadata: "parallax.proto",
+}
+
+const (
+	RunnerService_RunCollection_FullMethodName = "/parallax.RunnerService/RunCollection"
+)
+
+// RunnerServiceClient is the client API for RunnerService service.
+//
+// For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
+//
+// =============================================================================
+// Runner Service
+// =============================================================================
+type RunnerServiceClient interface {
+	RunCollection(ctx context.Context, in *RunRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[RunEvent], error)
+}
+
+type runnerServiceClient struct {
+	cc grpc.ClientConnInterface
+}
+
+func NewRunnerServiceClient(cc grpc.ClientConnInterface) RunnerServiceClient {
+	return &runnerServiceClient{cc}
+}
+
+func (c *runnerServiceClient) RunCollection(ctx context.Context, in *RunRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[RunEvent], error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	stream, err := c.cc.NewStream(ctx, &RunnerService_ServiceDesc.Streams[0], RunnerService_RunCollection_FullMethodName, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	x := &grpc.GenericClientStream[RunRequest, RunEvent]{ClientStream: stream}
+	if err := x.ClientStream.SendMsg(in); err != nil {
+		return nil, err
+	}
+	if err := x.ClientStream.CloseSend(); err != nil {
+		return nil, err
+	}
+	return x, nil
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type RunnerService_RunCollectionClient = grpc.ServerStreamingClient[RunEvent]
+
+// RunnerServiceServer is the server API for RunnerService service.
+// All implementations must embed UnimplementedRunnerServiceServer
+// for forward compatibility.
+//
+// =============================================================================
+// Runner Service
+// =============================================================================
+type RunnerServiceServer interface {
+	RunCollection(*RunRequest, grpc.ServerStreamingServer[RunEvent]) error
+	mustEmbedUnimplementedRunnerServiceServer()
+}
+
+// UnimplementedRunnerServiceServer must be embedded to have
+// forward compatible implementations.
+//
+// NOTE: this should be embedded by value instead of pointer to avoid a nil
+// pointer dereference when methods are called.
+type UnimplementedRunnerServiceServer struct{}
+
+func (UnimplementedRunnerServiceServer) RunCollection(*RunRequest, grpc.ServerStreamingServer[RunEvent]) error {
+	return status.Error(codes.Unimplemented, "method RunCollection not implemented")
+}
+func (UnimplementedRunnerServiceServer) mustEmbedUnimplementedRunnerServiceServer() {}
+func (UnimplementedRunnerServiceServer) testEmbeddedByValue()                       {}
+
+// UnsafeRunnerServiceServer may be embedded to opt out of forward compatibility for this service.
+// Use of this interface is not recommended, as added methods to RunnerServiceServer will
+// result in compilation errors.
+type UnsafeRunnerServiceServer interface {
+	mustEmbedUnimplementedRunnerServiceServer()
+}
+
+func RegisterRunnerServiceServer(s grpc.ServiceRegistrar, srv RunnerServiceServer) {
+	// If the following call panics, it indicates UnimplementedRunnerServiceServer was
+	// embedded by pointer and is nil.  This will cause panics if an
+	// unimplemented method is ever invoked, so we test this at initialization
+	// time to prevent it from happening at runtime later due to I/O.
+	if t, ok := srv.(interface{ testEmbeddedByValue() }); ok {
+		t.testEmbeddedByValue()
+	}
+	s.RegisterService(&RunnerService_ServiceDesc, srv)
+}
+
+func _RunnerService_RunCollection_Handler(srv interface{}, stream grpc.ServerStream) error {
+	m := new(RunRequest)
+	if err := stream.RecvMsg(m); err != nil {
+		return err
+	}
+	return srv.(RunnerServiceServer).RunCollection(m, &grpc.GenericServerStream[RunRequest, RunEvent]{ServerStream: stream})
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type RunnerService_RunCollectionServer = grpc.ServerStreamingServer[RunEvent]
+
+// RunnerService_ServiceDesc is the grpc.ServiceDesc for RunnerService service.
+// It's only intended for direct use with grpc.RegisterService,
+// and not to be introspected or modified (even as a copy)
+var RunnerService_ServiceDesc = grpc.ServiceDesc{
+	ServiceName: "parallax.RunnerService",
+	HandlerType: (*RunnerServiceServer)(nil),
+	Methods:     []grpc.MethodDesc{},
+	Streams: []grpc.StreamDesc{
+		{
+			StreamName:    "RunCollection",
+			Handler:       _RunnerService_RunCollection_Handler,
+			ServerStreams: true,
+		},
+	},
 	Metadata: "parallax.proto",
 }

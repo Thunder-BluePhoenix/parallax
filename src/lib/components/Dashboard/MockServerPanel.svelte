@@ -73,8 +73,8 @@
   <div class="mock-form">
     <div class="form-row">
       <div class="config-field" style="flex: 0 0 100px;">
-        <label>Method</label>
-        <select class="form-select" bind:value={newMethod}>
+        <label for="mock-method">Method</label>
+        <select id="mock-method" class="form-select" bind:value={newMethod}>
           <option>GET</option>
           <option>POST</option>
           <option>PUT</option>
@@ -83,27 +83,27 @@
         </select>
       </div>
       <div class="config-field flex-1">
-        <label>Path</label>
-        <input type="text" class="form-input" bind:value={newPath} placeholder="/api/v1/users/:id" />
+        <label for="mock-path">Path</label>
+        <input id="mock-path" type="text" class="form-input" bind:value={newPath} placeholder="/api/v1/users/:id" />
       </div>
       <div class="config-field" style="flex: 0 0 100px;">
-        <label>Status</label>
-        <input type="number" class="form-input" bind:value={newStatus} />
+        <label for="mock-status">Status</label>
+        <input id="mock-status" type="number" class="form-input" bind:value={newStatus} />
       </div>
     </div>
 
     <div class="form-row">
       <div class="config-field flex-1">
-        <label>Response Body (Supports Template Tags)</label>
-        <textarea class="form-textarea" bind:value={newBody} placeholder="Raw response body..."></textarea>
+        <label for="mock-body">Response Body (Supports Template Tags)</label>
+        <textarea id="mock-body" class="form-textarea" bind:value={newBody} placeholder="Raw response body..."></textarea>
         <div class="help-text">Use <code>{`{{.Params.id}}`}</code> or <code>{`{{.Query.token}}`}</code> to inject dynamic data.</div>
       </div>
     </div>
 
     <div class="form-row">
       <div class="config-field flex-1">
-        <label>Content Type</label>
-        <input type="text" class="form-input" bind:value={newContentType} />
+        <label for="mock-content-type">Content Type</label>
+        <input id="mock-content-type" type="text" class="form-input" bind:value={newContentType} />
       </div>
       <button class="btn-primary" onclick={addRule}>Create Mock Endpoint</button>
     </div>

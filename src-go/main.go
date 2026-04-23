@@ -21,7 +21,9 @@ import (
 	"github.com/bluephoenix/parallax-worker/mock"
 	"github.com/bluephoenix/parallax-worker/models"
 	"github.com/bluephoenix/parallax-worker/runner"
+	"github.com/bluephoenix/parallax-worker/ai"
 	"path/filepath"
+	"strings"
 	"gopkg.in/yaml.v3"
 	"time"
 )
@@ -76,9 +78,10 @@ func main() {
 	healthSvc := health.New(store)
 	proxySvc := proxy.New(*proxyPort, store)
 	mockSvc := mock.New(*mockPort, store)
+	aiSvc := ai.New()
 
 	// Start gRPC server
-	grpcServer := grpcworker.NewServer(watcherSvc, loadtestSvc, healthSvc, proxySvc, mockSvc)
+	grpcServer := grpcworker.NewServer(watcherSvc, loadtestSvc, healthSvc, proxySvc, mockSvc, aiSvc)
 
 	go func() {
 		log.Printf("gRPC server listening on :%d", *grpcPort)
@@ -117,12 +120,16 @@ func main() {
 func handleCLIRun(args []string) {
 	fs := flag.NewFlagSet("run", flag.ExitOnError)
 	envPath := fs.String("e", "", "Environment file path")
+	globalsPath := fs.String("g", "", "Global variables file path")
 	iterations := fs.Int("i", 1, "Number of iterations")
 	delay := fs.Int("d", 0, "Delay between requests in ms")
+	verbose := fs.Bool("v", false, "Verbose output")
 	fs.Parse(args)
 
 	if fs.NArg() < 1 {
-		fmt.Println("Usage: parallax run <collection.yaml> [-e <environment.json>] [-i <iterations>] [-d <delay_ms>]")
+		fmt.Println("Usage: parallax run <collection.yaml> [options]")
+		fmt.Println("Options:")
+		fs.PrintDefaults()
 		os.Exit(1)
 	}
 
@@ -136,30 +143,53 @@ func handleCLIRun(args []string) {
 	}
 
 	var col models.Collection
-	if err := yaml.Unmarshal(colData, &col); err != nil {
-		fmt.Printf("Error parsing collection: %v\n", err)
-		os.Exit(1)
+	if strings.HasSuffix(colPath, ".yaml") || strings.HasSuffix(colPath, ".yml") {
+		if err := yaml.Unmarshal(colData, &col); err != nil {
+			fmt.Printf("Error parsing YAML collection: %v\n", err)
+			os.Exit(1)
+		}
+	} else {
+		if err := json.Unmarshal(colData, &col); err != nil {
+			fmt.Printf("Error parsing JSON collection: %v\n", err)
+			os.Exit(1)
+		}
 	}
 
 	// Load environment
 	env := make(map[string]string)
-	if *envPath != "" {
-		envData, err := os.ReadFile(*envPath)
-		if err == nil {
-			var envObj struct {
-				Variables []struct {
-					Key   string `json:"key"`
-					Value string `json:"value"`
-				} `json:"variables"`
-			}
-			json.Unmarshal(envData, &envObj)
-			for _, v := range envObj.Variables {
-				env[v.Key] = v.Value
-			}
+	loadEnvFile := func(path string, prefix string) {
+		data, err := os.ReadFile(path)
+		if err != nil {
+			return
+		}
+		var envObj struct {
+			Values []struct {
+				Key   string      `json:"key"`
+				Value interface{} `json:"value"`
+			} `json:"values"`
+			Variables []struct { // Some formats use "variables"
+				Key   string      `json:"key"`
+				Value interface{} `json:"value"`
+			} `json:"variables"`
+		}
+		json.Unmarshal(data, &envObj)
+		for _, v := range envObj.Values {
+			env[prefix+v.Key] = fmt.Sprintf("%v", v.Value)
+		}
+		for _, v := range envObj.Variables {
+			env[prefix+v.Key] = fmt.Sprintf("%v", v.Value)
 		}
 	}
 
-	fmt.Printf("Running collection: %s (%d iterations)\n", col.Name, *iterations)
+	if *envPath != "" {
+		loadEnvFile(*envPath, "")
+	}
+	if *globalsPath != "" {
+		loadEnvFile(*globalsPath, "global.")
+	}
+
+	fmt.Printf("\n🚀 Running collection: %s\n", col.Name)
+	fmt.Printf("   Iterations: %d | Delay: %dms\n", *iterations, *delay)
 	fmt.Println("--------------------------------------------------")
 
 	var totalPassed, totalFailed int
@@ -167,7 +197,7 @@ func handleCLIRun(args []string) {
 
 	for iter := 1; iter <= *iterations; iter++ {
 		if *iterations > 1 {
-			fmt.Printf("\nIteration %d:\n", iter)
+			fmt.Printf("\n[Iteration %d]\n", iter)
 		}
 		stats, err := runner.RunCollection(col, env)
 		if err != nil {
@@ -183,11 +213,25 @@ func handleCLIRun(args []string) {
 		}
 	}
 
-	fmt.Println("--------------------------------------------------")
-	fmt.Printf("Run Summary: %d Passed, %d Failed, %dms Total\n", totalPassed, totalFailed, totalDuration)
+	fmt.Println("\n--------------------------------------------------")
+	fmt.Printf("🏁 Run Summary:\n")
+	fmt.Printf("   ✅ Passed: %d\n", totalPassed)
+	fmt.Printf("   ❌ Failed: %d\n", totalFailed)
+	fmt.Printf("   ⏱️  Total Duration: %dms\n", totalDuration)
 
 	if totalFailed > 0 {
+		fmt.Printf("\n❌ Build FAILED (%d failed assertions)\n", totalFailed)
 		os.Exit(1)
+	} else {
+		fmt.Printf("\n✅ Build PASSED\n")
+	}
+
+	if *verbose {
+		// Log detailed environment state if requested
+		fmt.Printf("\nFinal Environment State:\n")
+		for k, v := range env {
+			fmt.Printf("  %s: %s\n", k, v)
+		}
 	}
 }
 

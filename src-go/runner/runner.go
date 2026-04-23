@@ -47,13 +47,23 @@ func RunCollection(col models.Collection, env map[string]string) (*RunStats, err
 func runRequest(req models.CollectionRequest, env map[string]string, stats *RunStats) error {
 	client := &http.Client{Timeout: 30 * time.Second}
 
-	// Template engine
+// Template engine
 	resolve := func(s string) string {
 		re := regexp.MustCompile(`\{\{([^}]+)\}\}`)
 		return re.ReplaceAllStringFunc(s, func(match string) string {
 			key := strings.TrimSpace(match[2 : len(match)-2])
+			// Check env
 			if val, ok := env[key]; ok {
 				return val
+			}
+			// Check if key is nested e.g. "env.var"
+			parts := strings.Split(key, ".")
+			if len(parts) > 1 {
+				prefix := parts[0]
+				actualKey := strings.Join(parts[1:], ".")
+				if prefix == "env" || prefix == "environment" {
+					return env[actualKey]
+				}
 			}
 			return match
 		})
@@ -63,10 +73,21 @@ func runRequest(req models.CollectionRequest, env map[string]string, stats *RunS
 
 	// Pre-request script
 	vm := goja.New()
+	
+	// Helper for assertions
 	vm.Set("pm", map[string]interface{}{
 		"environment": map[string]interface{}{
 			"get": func(k string) string { return env[k] },
 			"set": func(k, v string) { env[k] = v },
+			"has": func(k string) bool { _, ok := env[k]; return ok },
+		},
+		"globals": map[string]interface{}{
+			"get": func(k string) string { return env["global."+k] }, // Mock globals for now
+			"set": func(k, v string) { env["global."+k] = v },
+		},
+		"collectionVariables": map[string]interface{}{
+			"get": func(k string) string { return env["col."+k] },
+			"set": func(k, v string) { env["col."+k] = v },
 		},
 	})
 	
@@ -116,57 +137,73 @@ func runRequest(req models.CollectionRequest, env map[string]string, stats *RunS
 	var testResults []string
 	var testErrors []string
 	if req.Scripts != nil && req.Scripts.Tests != "" {
-		vm.Set("pm", map[string]interface{}{
-			"environment": map[string]interface{}{
-				"get": func(k string) string { return env[k] },
-				"set": func(k, v string) { env[k] = v },
-			},
-			"response": map[string]interface{}{
-				"code": resp.StatusCode,
-				"json": func() interface{} {
-					var data interface{}
-					json.Unmarshal(respBodyBytes, &data)
-					return data
-				},
-				"text": func() string { return respBodyStr },
-			},
-			"test": func(name string, fn func()) {
-				defer func() {
-					if r := recover(); r != nil {
-						testErrors = append(testErrors, fmt.Sprintf("%s: %v", name, r))
-					}
-				}()
-				fn()
-				testResults = append(testResults, name)
-			},
-			"expect": func(val interface{}) interface{} {
-				return map[string]interface{}{
-					"to": map[string]interface{}{
-						"have": map[string]interface{}{
-							"status": func(s int) {
-								if resp.StatusCode != s {
-									panic(fmt.Sprintf("expected status %d but got %d", s, resp.StatusCode))
-								}
-							},
-						},
-						"equal": func(exp interface{}) {
-							if val != exp {
-								panic(fmt.Sprintf("expected %v but got %v", exp, val))
-							}
-						},
-						"include": func(exp interface{}) {
-							s, ok1 := val.(string)
-							e, ok2 := exp.(string)
-							if ok1 && ok2 {
-								if !strings.Contains(s, e) {
-									panic(fmt.Sprintf("expected %s to include %s", s, e))
-								}
+		// Define pm.expect helper
+		expectFn := func(val interface{}) interface{} {
+			return map[string]interface{}{
+				"to": map[string]interface{}{
+					"be": map[string]interface{}{
+						"a": func(t string) {
+							actualType := fmt.Sprintf("%T", val)
+							if !strings.Contains(strings.ToLower(actualType), strings.ToLower(t)) {
+								panic(fmt.Sprintf("expected type %s but got %s", t, actualType))
 							}
 						},
 					},
-				}
+					"have": map[string]interface{}{
+						"status": func(s int) {
+							if resp.StatusCode != s {
+								panic(fmt.Sprintf("expected status %d but got %d", s, resp.StatusCode))
+							}
+						},
+						"json": func() {
+							var js interface{}
+							if err := json.Unmarshal(respBodyBytes, &js); err != nil {
+								panic("response body is not valid JSON")
+							}
+						},
+					},
+					"equal": func(exp interface{}) {
+						if fmt.Sprintf("%v", val) != fmt.Sprintf("%v", exp) {
+							panic(fmt.Sprintf("expected %v but got %v", exp, val))
+						}
+					},
+					"include": func(exp interface{}) {
+						s, ok1 := val.(string)
+						e, ok2 := exp.(string)
+						if ok1 && ok2 {
+							if !strings.Contains(s, e) {
+								panic(fmt.Sprintf("expected string to include %s", e))
+							}
+						}
+					},
+				},
+			}
+		}
+
+		pmObj := vm.Get("pm").Export().(map[string]interface{})
+		pmObj["response"] = map[string]interface{}{
+			"code": resp.StatusCode,
+			"json": func() interface{} {
+				var data interface{}
+				json.Unmarshal(respBodyBytes, &data)
+				return data
 			},
-		})
+			"text": func() string { return respBodyStr },
+			"responseTime": duration.Milliseconds(),
+		}
+		pmObj["test"] = func(name string, fn func()) {
+			defer func() {
+				if r := recover(); r != nil {
+					testErrors = append(testErrors, fmt.Sprintf("%s: %v", name, r))
+				}
+			}()
+			fn()
+			testResults = append(testResults, name)
+		}
+		pmObj["expect"] = expectFn
+		
+		vm.Set("pm", pmObj)
+
 		if _, err := vm.RunString(req.Scripts.Tests); err != nil {
 			fmt.Printf("  Script Error: %v\n", err)
 			testErrors = append(testErrors, fmt.Sprintf("Script Error: %v", err))

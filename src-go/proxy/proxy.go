@@ -5,6 +5,7 @@ package proxy
 import (
 	"bufio"
 	"crypto/tls"
+	"encoding/json"
 	"fmt"
 	"io"
 	"log"
@@ -12,6 +13,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -34,11 +36,19 @@ type TrafficEntry struct {
 	Preview     string            `json:"preview"` // First 512 chars of response body
 }
 
+type TrafficFilter struct {
+	IncludeDomains []string `json:"include_domains"`
+	ExcludeDomains []string `json:"exclude_domains"`
+	OnlyMethods    []string `json:"only_methods"`
+	MinStatus      int      `json:"min_status"`
+}
+
 type Proxy struct {
 	port     int
 	server   *http.Server
 	mu       sync.RWMutex
 	traffic  []TrafficEntry
+	filter   TrafficFilter
 	onTraffic func(TrafficEntry)
 	counter  atomic.Int64
 	active   bool
@@ -107,10 +117,57 @@ func (p *Proxy) Stop() {
 	p.active = false
 }
 
+func (p *Proxy) SetFilter(f TrafficFilter) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.filter = f
+	log.Printf("[proxy] Updated filters: %d incl, %d excl", len(f.IncludeDomains), len(f.ExcludeDomains))
+}
+
 func (p *Proxy) handleHTTP(w http.ResponseWriter, r *http.Request) {
 	if r.Method == http.MethodConnect {
 		p.handleTunnel(w, r)
 		return
+	}
+
+	p.mu.RLock()
+	filter := p.filter
+	p.mu.RUnlock()
+
+	// Apply filters
+	if len(filter.OnlyMethods) > 0 {
+		match := false
+		for _, m := range filter.OnlyMethods {
+			if strings.EqualFold(m, r.Method) {
+				match = true
+				break
+			}
+		}
+		if !match {
+			p.forwardSilent(w, r)
+			return
+		}
+	}
+
+	if len(filter.IncludeDomains) > 0 {
+		match := false
+		for _, d := range filter.IncludeDomains {
+			if strings.Contains(r.URL.Host, d) {
+				match = true
+				break
+			}
+		}
+		if !match {
+			p.forwardSilent(w, r)
+			return
+		}
+	}
+
+	for _, d := range filter.ExcludeDomains {
+		if strings.Contains(r.URL.Host, d) {
+			p.forwardSilent(w, r)
+			return
+		}
 	}
 
 	start := time.Now()
@@ -199,6 +256,101 @@ func (p *Proxy) handleHTTP(w http.ResponseWriter, r *http.Request) {
 			entry.StatusCode, entry.LatencyMs, entry.ContentType, entry.Preview,
 		)
 	}
+}
+
+// forwardSilent forwards the request without recording it in the traffic log
+func (p *Proxy) forwardSilent(w http.ResponseWriter, r *http.Request) {
+	outReq := r.Clone(r.Context())
+	outReq.RequestURI = ""
+	transport := &http.Transport{
+		TLSClientConfig: &tls.Config{InsecureSkipVerify: false},
+	}
+	client := &http.Client{Transport: transport}
+	resp, err := client.Do(outReq)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadGateway)
+		return
+	}
+	defer resp.Body.Close()
+	for k, vv := range resp.Header {
+		for _, v := range vv {
+			w.Header().Add(k, v)
+		}
+	}
+	w.WriteHeader(resp.StatusCode)
+	io.Copy(w, resp.Body)
+}
+
+func (p *Proxy) ExportHAR() (string, error) {
+	p.mu.RLock()
+	defer p.mu.RUnlock()
+
+	type HarLog struct {
+		Version string `json:"version"`
+		Creator struct {
+			Name    string `json:"name"`
+			Version string `json:"version"`
+		} `json:"creator"`
+		Entries []interface{} `json:"entries"`
+	}
+
+	har := struct {
+		Log HarLog `json:"log"`
+	}{}
+	har.Log.Version = "1.2"
+	har.Log.Creator.Name = "Parallax Proxy"
+	har.Log.Creator.Version = "0.1.0"
+
+	for _, entry := range p.traffic {
+		if entry.Method == "CONNECT" {
+			continue
+		}
+		harEntry := map[string]interface{}{
+			"startedDateTime": time.UnixMilli(entry.Timestamp).Format(time.RFC3339),
+			"time":            entry.LatencyMs,
+			"request": map[string]interface{}{
+				"method":      entry.Method,
+				"url":         entry.URL,
+				"httpVersion": "HTTP/1.1",
+				"headers":     p.mapToHarHeaders(entry.RequestHeaders),
+				"queryString": []interface{}{},
+				"cookies":     []interface{}{},
+				"bodySize":    entry.RequestBodySize,
+			},
+			"response": map[string]interface{}{
+				"status":      entry.StatusCode,
+				"statusText":  http.StatusText(entry.StatusCode),
+				"httpVersion": "HTTP/1.1",
+				"headers":     p.mapToHarHeaders(entry.ResponseHeaders),
+				"cookies":     []interface{}{},
+				"content": map[string]interface{}{
+					"size":     entry.ResponseBodySize,
+					"mimeType": entry.ContentType,
+					"text":     entry.Preview,
+				},
+				"redirectURL": "",
+				"bodySize":    entry.ResponseBodySize,
+			},
+			"cache": map[string]interface{}{},
+			"timings": map[string]interface{}{
+				"send":    0,
+				"wait":    entry.LatencyMs,
+				"receive": 0,
+			},
+		}
+		har.Log.Entries = append(har.Log.Entries, harEntry)
+	}
+
+	data, err := json.MarshalIndent(har, "", "  ")
+	return string(data), err
+}
+
+func (p *Proxy) mapToHarHeaders(headers map[string]string) []map[string]string {
+	result := make([]map[string]string, 0, len(headers))
+	for k, v := range headers {
+		result = append(result, map[string]string{"name": k, "value": v})
+	}
+	return result
 }
 
 func (p *Proxy) handleCADownload(w http.ResponseWriter, r *http.Request) {

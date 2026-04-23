@@ -191,6 +191,85 @@
   function totalRequestCount(col: Collection): number {
     return col.requests.length + col.folders.reduce((s, f) => s + f.requests.length, 0);
   }
+
+  // ── OpenAPI 3.0 generator ─────────────────────────────────────
+
+  function generateOpenAPI(col: Collection): string {
+    const paths: Record<string, any> = {};
+
+    function addRequest(req: CollectionRequest, tag?: string) {
+      const urlPath = req.url.replace(/https?:\/\/[^/]+/, "").replace(/\{\{[^}]+\}\}/g, "{param}") || "/";
+      const method = req.method.toLowerCase();
+      if (!paths[urlPath]) paths[urlPath] = {};
+
+      const parameters: any[] = [];
+      for (const [k, v] of Object.entries(req.params ?? {})) {
+        parameters.push({ name: k, in: "query", schema: { type: "string" }, example: v });
+      }
+      for (const [k, v] of Object.entries(req.headers ?? {})) {
+        if (!["content-type", "authorization", "accept"].includes(k.toLowerCase())) {
+          parameters.push({ name: k, in: "header", schema: { type: "string" }, example: v });
+        }
+      }
+
+      const op: any = {
+        summary: req.name,
+        operationId: req.id || req.name.replace(/\s+/g, "_").toLowerCase(),
+        parameters,
+        responses: { "200": { description: "Success" }, "400": { description: "Bad Request" }, "401": { description: "Unauthorized" } },
+      };
+      if (tag) op.tags = [tag];
+
+      if (req.body && req.body.raw && ["post", "put", "patch"].includes(method)) {
+        const ct = req.body.type === "json" ? "application/json" : req.body.type === "form" ? "multipart/form-data" : "text/plain";
+        op.requestBody = { required: true, content: { [ct]: { example: req.body.raw } } };
+      }
+
+      if (req.auth?.type === "bearer") {
+        op.security = [{ bearerAuth: [] }];
+      } else if (req.auth?.type === "api_key") {
+        op.security = [{ apiKeyAuth: [] }];
+      }
+
+      paths[urlPath][method] = op;
+    }
+
+    for (const req of col.requests) addRequest(req);
+    for (const folder of col.folders) {
+      for (const req of folder.requests) addRequest(req, folder.name);
+    }
+
+    const tags = col.folders.map(f => ({ name: f.name }));
+
+    const spec: any = {
+      openapi: "3.0.0",
+      info: { title: col.name, version: col.version || "1.0.0", description: col.description || "" },
+      paths,
+      components: {
+        securitySchemes: {
+          bearerAuth: { type: "http", scheme: "bearer" },
+          apiKeyAuth: { type: "apiKey", in: "header", name: "X-API-Key" },
+        },
+      },
+    };
+    if (tags.length > 0) spec.tags = tags;
+    if (col.variables && Object.keys(col.variables).length > 0) {
+      spec.servers = [{ url: col.variables["base_url"] ?? col.variables["baseUrl"] ?? "https://api.example.com" }];
+    }
+
+    return JSON.stringify(spec, null, 2);
+  }
+
+  function exportOpenAPI() {
+    if (!collection) return;
+    const json = generateOpenAPI(collection);
+    const blob = new Blob([json], { type: "application/json" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = `${collection.name.replace(/\s+/g, "-").toLowerCase()}-openapi.json`;
+    a.click();
+    URL.revokeObjectURL(a.href);
+  }
 </script>
 
 <div class="dashboard-section animate-fade-in">
@@ -269,6 +348,10 @@
       <button class="btn-action" onclick={preview} disabled={previewing}>
         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
         Preview HTML
+      </button>
+      <button class="btn-action" onclick={exportOpenAPI}>
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        Export OpenAPI
       </button>
 
       {#if githubIdentity.value}

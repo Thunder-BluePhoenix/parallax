@@ -38,6 +38,96 @@ const (
 	EventSummary      = "summary"
 )
 
+// RequestResult holds the result of a single executed request.
+type RequestResult struct {
+	Status     int               `json:"status"`
+	Body       string            `json:"body"`
+	Headers    map[string]string `json:"headers"`
+	DurationMs int64             `json:"duration_ms"`
+}
+
+// RunRequest executes a single named request from a collection and returns its result.
+// Returns an error if the request is not found or the HTTP call fails.
+func RunRequest(col models.Collection, reqID string, env map[string]string) (*RequestResult, error) {
+	var target *models.CollectionRequest
+	for i := range col.Requests {
+		if col.Requests[i].ID == reqID || col.Requests[i].Name == reqID {
+			target = &col.Requests[i]
+			break
+		}
+	}
+	if target == nil {
+		for _, folder := range col.Folders {
+			for i := range folder.Requests {
+				if folder.Requests[i].ID == reqID || folder.Requests[i].Name == reqID {
+					target = &folder.Requests[i]
+					break
+				}
+			}
+			if target != nil {
+				break
+			}
+		}
+	}
+	if target == nil {
+		return nil, fmt.Errorf("request %q not found in collection", reqID)
+	}
+	return runSingle(*target, env)
+}
+
+func runSingle(req models.CollectionRequest, env map[string]string) (*RequestResult, error) {
+	client := &http.Client{Timeout: 30 * time.Second}
+	resolve := func(s string) string {
+		re := regexp.MustCompile(`\{\{([^}]+)\}\}`)
+		return re.ReplaceAllStringFunc(s, func(match string) string {
+			key := strings.TrimSpace(match[2 : len(match)-2])
+			if val, ok := env[key]; ok {
+				return val
+			}
+			return match
+		})
+	}
+
+	var body io.Reader
+	if req.Body != nil && req.Body.Content != "" {
+		body = bytes.NewBufferString(resolve(req.Body.Content))
+	}
+	httpReq, err := http.NewRequest(req.Method, resolve(req.URL), body)
+	if err != nil {
+		return nil, err
+	}
+	for k, v := range req.Headers {
+		httpReq.Header.Set(resolve(k), resolve(v))
+	}
+	if req.Auth != nil {
+		if req.Auth.Type == "bearer" && req.Auth.Token != "" {
+			httpReq.Header.Set("Authorization", "Bearer "+resolve(req.Auth.Token))
+		} else if req.Auth.Type == "basic" {
+			httpReq.SetBasicAuth(resolve(req.Auth.Username), resolve(req.Auth.Password))
+		}
+	}
+
+	t0 := time.Now()
+	resp, err := client.Do(httpReq)
+	duration := time.Since(t0)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+	respBytes, _ := io.ReadAll(resp.Body)
+
+	headers := make(map[string]string, len(resp.Header))
+	for k, vv := range resp.Header {
+		headers[k] = strings.Join(vv, ", ")
+	}
+	return &RequestResult{
+		Status:     resp.StatusCode,
+		Body:       string(respBytes),
+		Headers:    headers,
+		DurationMs: duration.Milliseconds(),
+	}, nil
+}
+
 // RunCollection is the synchronous CLI version — no streaming.
 func RunCollection(col models.Collection, env map[string]string) (*RunStats, error) {
 	return RunCollectionStream(col, env, nil)

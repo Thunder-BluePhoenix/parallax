@@ -1,6 +1,27 @@
 <script lang="ts">
   import { invoke } from "@tauri-apps/api/core";
   import { activeRequest, activeScripts } from "../../stores/app.svelte";
+  import { generateScript, aiStatus } from "../../stores/ai.svelte";
+
+  let aiPrompt = $state("");
+  let aiScriptError = $state("");
+
+  async function handleAIScript() {
+    if (!aiPrompt.trim()) return;
+    aiScriptError = "";
+    try {
+      const type = scriptTab === "pre" ? "pre-request" : "test";
+      const result = await generateScript(type, aiPrompt);
+      if (scriptTab === "pre") {
+        activeScripts.preRequest = result;
+      } else {
+        activeScripts.tests = result;
+      }
+      aiPrompt = "";
+    } catch (e: any) {
+      aiScriptError = e.toString();
+    }
+  }
 
   let { activeTab = $bindable() } = $props<{ activeTab: string }>();
 
@@ -336,6 +357,26 @@
           >Tests</button>
         </div>
 
+        <div class="ai-script-bar">
+          <input
+            class="ai-script-input"
+            placeholder="Describe what the script should do… (AI)"
+            bind:value={aiPrompt}
+            onkeydown={(e) => e.key === "Enter" && handleAIScript()}
+          />
+          <button
+            class="ai-script-btn"
+            onclick={handleAIScript}
+            disabled={aiStatus.busy || !aiPrompt.trim()}
+            title="Generate script with AI"
+          >
+            {aiStatus.busy ? "…" : "✨ AI"}
+          </button>
+        </div>
+        {#if aiScriptError}
+          <div class="ai-script-error">{aiScriptError}</div>
+        {/if}
+
         {#if scriptTab === "pre"}
           <div class="script-editor-wrap">
             <div class="script-hint mono">// pm.environment.set("token", pm.response.json().token);</div>
@@ -557,6 +598,30 @@
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
+  }
+
+  .ai-script-bar {
+    display: flex; gap: 6px; padding: 6px 10px;
+    background: var(--bg-surface); border-bottom: 1px solid var(--border-subtle);
+    flex-shrink: 0;
+  }
+  .ai-script-input {
+    flex: 1; height: 26px; padding: 0 8px; font-size: 11px;
+    background: var(--bg-input); border: 1px solid var(--border-default);
+    border-radius: var(--radius-sm); color: var(--text-primary);
+  }
+  .ai-script-input:focus { border-color: var(--accent-primary); outline: none; }
+  .ai-script-btn {
+    height: 26px; padding: 0 10px; font-size: 11px; font-weight: 600;
+    background: var(--accent-primary-dim); color: var(--accent-primary);
+    border: 1px solid var(--accent-primary); border-radius: var(--radius-sm);
+    cursor: pointer; white-space: nowrap; transition: var(--transition-fast);
+  }
+  .ai-script-btn:hover:not(:disabled) { background: var(--accent-primary); color: white; }
+  .ai-script-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+  .ai-script-error {
+    padding: 4px 10px; font-size: 10px; color: var(--color-error);
+    background: var(--color-error-dim); flex-shrink: 0;
   }
 
   .script-textarea {

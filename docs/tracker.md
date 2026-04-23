@@ -1,6 +1,6 @@
 # Parallax — Development Tracker
 
-Last updated: 2026-04-24 (Phase 2.5 complete)
+Last updated: 2026-04-24 (Phase 3 complete)
 
 ---
 
@@ -10,7 +10,7 @@ Last updated: 2026-04-24 (Phase 2.5 complete)
 Phase 1    ███████████████████░  97%  🔄 Near Complete (HTTP/3 + gRPC client calls remain)
 Phase 2    ████████████████████ 100%  ✅ Complete
 Phase 2.5  ████████████████████ 100%  ✅ Complete (Git Collaboration + Chat)
-Phase 3    ██░░░░░░░░░░░░░░░░░░  12%  🔄 Started (AI test gen end-to-end: Go+Rust+UI for Ollama+OpenAI)
+Phase 3    ████████████████████ 100%  ✅ Complete (AI providers, MCP server, Design Mode, script assistant, OpenAPI export)
 Phase 4    ░░░░░░░░░░░░░░░░░░░░   0%  🔲 Planned
 Phase 5    ░░░░░░░░░░░░░░░░░░░░   0%  🔲 Planned
 ```
@@ -381,38 +381,46 @@ Phase 5    ░░░░░░░░░░░░░░░░░░░░   0%  �
 
 ## Phase 3 — AI Integration & MCP Server
 
-> AI test generator shipped early (Go+Rust+UI). MCP server, remaining AI features, and doc generator not yet started.
+> Complete. All 5 AI providers, 4 AI actions, MCP server with all 3 tools wired, Design Mode (OpenAPI editor), AI script assistant in scripts tab, OpenAPI 3.0 export from DocsPanel.
 
 ### BYO-AI Providers
 | Task | Status | Notes |
 |---|---|---|
 | OpenAI provider | ✅ Done | `ai.go` `callOpenAI()` — JSON mode; chat completions |
 | Ollama provider | ✅ Done | `ai.go` `callOllama()` — local model, JSON format |
-| AI settings UI + `ai.svelte.ts` store | ✅ Done | `AISettingsPanel.svelte` (129 lines) + `ai.svelte.ts` store |
-| Rust `ai_generate_tests` Tauri command | ✅ Done | `ai.rs` — passes config + request context to Go gRPC |
-| Anthropic / Gemini / Custom providers | 🔲 | |
-| Air-gap mode (Ollama-only) | 🔲 | |
+| Anthropic (Claude) provider | ✅ Done | `ai.go` `callAnthropic()` — `x-api-key` + `anthropic-version` headers |
+| Google Gemini provider | ✅ Done | `ai.go` `callGemini()` — `responseMimeType: application/json` |
+| Custom (OpenAI-compatible) provider | ✅ Done | Reuses `callOpenAI()` with configurable `baseUrl` |
+| AI settings UI + `ai.svelte.ts` store | ✅ Done | `AISettingsPanel.svelte` + `ai.svelte.ts` — 4 store actions |
+| Air-gap mode (Ollama-only) | ✅ Done | Guard in every store action; cloud providers rejected |
 
 ### AI Features
 | Task | Status | Notes |
 |---|---|---|
-| AI test generator | ✅ Done | Go `ai.go` → OpenAI / Ollama; returns `js` + `yaml` assertions |
-| AI request repair (4xx/5xx) | 🔲 | |
-| AI collection creator | 🔲 | |
-| AI script assistant | 🔲 | |
-| AI env variable suggestion | 🔲 | |
+| AI test generator | ✅ Done | Response panel "Generate Tests" → `ai_generate_tests` → Go gRPC |
+| AI request repair (4xx/5xx) | ✅ Done | Response panel "Diagnose with AI" → `ai_repair_request` → diagnosis + fix list |
+| AI collection creator | ✅ Done | `AISettingsPanel` textarea → `ai_create_collection` → YAML output + copy |
+| AI script assistant | ✅ Done | Scripts tab prompt bar → `generateScript` → inserts into pre-request or test editor |
+| AI env variable suggestion | 🔲 | Deferred to Phase 4 |
 
 ### MCP Server
-| Task | Status |
-|---|---|
-| MCP HTTP server (`localhost:7676`) | 🔲 |
-| All `parallax.*` tool endpoints | 🔲 |
+| Task | Status | Notes |
+|---|---|---|
+| MCP HTTP+SSE server (`localhost:7676`) | ✅ Done | `src-go/mcp/mcp.go` — JSON-RPC 2.0 over HTTP; `--mcp` flag enables |
+| `parallax.list_collections` tool | ✅ Done | Reads `.parallax/collections/` dir; returns name + path + request count |
+| `parallax.get_traffic` tool | ✅ Done | Returns last N proxy entries from live proxy service |
+| `parallax.execute_request` tool | ✅ Done | Loads collection YAML, finds request by ID/name, runs via `runner.RunRequest()` |
+| Bearer token auth | ✅ Done | `--mcp-token` flag; `Authorization: Bearer` checked on SSE + message endpoints |
+| MCP toggle + URL in AI settings UI | ✅ Done | `AISettingsPanel` toggle shows `http://localhost:7676/mcp/sse` + copy button |
 
 ### Documentation Generator
-| Task | Status |
-|---|---|
-| Static HTML / Markdown export | 🔲 |
-| OpenAPI reverse-generation from collection | 🔲 |
+| Task | Status | Notes |
+|---|---|---|
+| Static single-page HTML export | ✅ Done | `DocsPanel.svelte` `generateHTML()` — sidebar nav, method badges, headers/params/body/scripts |
+| Publish HTML to GitHub Pages | ✅ Done | `github_publish_docs` Rust command → `gh-pages` branch upsert |
+| OpenAPI 3.0 JSON export | ✅ Done | `DocsPanel.svelte` `generateOpenAPI()` — paths, parameters, requestBody, security schemes, tags |
+| OpenAPI download button | ✅ Done | Client-side Blob download as `{collection-name}-openapi.json` |
+| Design Mode — OpenAPI YAML editor | ✅ Done | `DesignMode.svelte` + `YamlEditor.svelte` + `ApiPreview.svelte` — live parse + endpoint preview |
 
 ---
 

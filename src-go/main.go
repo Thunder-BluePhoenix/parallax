@@ -3,6 +3,8 @@
 package main
 
 import (
+	"context"
+	"encoding/json"
 	"flag"
 	"fmt"
 	"log"
@@ -10,7 +12,6 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
-	"encoding/json"
 
 	"github.com/bluephoenix/parallax-worker/ai"
 	"github.com/bluephoenix/parallax-worker/chat"
@@ -130,6 +131,66 @@ func main() {
 				})
 			}
 			return result
+		})
+		mcpSrv.SetCollectionLister(func() ([]map[string]interface{}, error) {
+			dir := filepath.Join(".", ".parallax", "collections")
+			entries, err := os.ReadDir(dir)
+			if err != nil {
+				return []map[string]interface{}{}, nil
+			}
+			var cols []map[string]interface{}
+			for _, e := range entries {
+				if e.IsDir() {
+					continue
+				}
+				name := e.Name()
+				if !strings.HasSuffix(name, ".yaml") && !strings.HasSuffix(name, ".yml") && !strings.HasSuffix(name, ".json") {
+					continue
+				}
+				colPath := filepath.Join(dir, name)
+				data, err := os.ReadFile(colPath)
+				if err != nil {
+					continue
+				}
+				var col models.Collection
+				if strings.HasSuffix(name, ".json") {
+					json.Unmarshal(data, &col)
+				} else {
+					yaml.Unmarshal(data, &col)
+				}
+				count := len(col.Requests)
+				for _, f := range col.Folders {
+					count += len(f.Requests)
+				}
+				cols = append(cols, map[string]interface{}{
+					"name":          col.Name,
+					"path":          colPath,
+					"request_count": count,
+				})
+			}
+			return cols, nil
+		})
+		mcpSrv.SetRequestRunner(func(ctx context.Context, colPath, reqID string, env map[string]string) (map[string]interface{}, error) {
+			data, err := os.ReadFile(colPath)
+			if err != nil {
+				return nil, fmt.Errorf("collection not found: %w", err)
+			}
+			var col models.Collection
+			if strings.HasSuffix(colPath, ".json") {
+				json.Unmarshal(data, &col)
+			} else {
+				yaml.Unmarshal(data, &col)
+			}
+			result, err := runner.RunRequest(col, reqID, env)
+			if err != nil {
+				return nil, err
+			}
+			return map[string]interface{}{
+				"status":      result.Status,
+				"body":        result.Body,
+				"headers":     result.Headers,
+				"duration_ms": result.DurationMs,
+			}, nil
 		})
 		go func() {
 			log.Printf("MCP server listening on localhost:%d", *mcpPort)

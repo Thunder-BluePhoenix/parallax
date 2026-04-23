@@ -10,6 +10,8 @@ Cargo.lock
 # ─── Go ──────────────────────────────────────────────────────────────────────
 src-go/bin/
 src-go/vendor/
+src-go/parallax-worker
+src-go/parallax-worker-*
 *.exe
 *.test
 *.out
@@ -49,7 +51,12 @@ src-tauri/gen/
 # Request history — can be large and is machine-specific
 .parallax/history/
 
-# Health database
+# Sidecar SQLite database (health history + proxy traffic + mock rules)
+.parallax/worker.db
+.parallax/worker.db-shm
+.parallax/worker.db-wal
+
+# Health database (legacy path)
 .parallax/health.db
 .parallax/health.db-shm
 .parallax/health.db-wal
@@ -59,6 +66,9 @@ src-tauri/gen/
 
 # AI config — contains API keys
 .parallax/ai.json
+
+# Phase 2.5 — peer presence file contains local IP:port, never commit
+.parallax/team/presence.json
 
 # Generated docs output
 .parallax/docs/
@@ -90,6 +100,7 @@ desktop.ini
 *.pem
 *.key
 *.cert
+*.crt
 *.p12
 
 # ─── Logs ────────────────────────────────────────────────────────────────────
@@ -100,8 +111,8 @@ yarn-debug.log*
 yarn-error.log*
 
 # ─── gRPC Generated Code ─────────────────────────────────────────────────────
-# Regenerated from .proto files — don't commit generated stubs
-src-go/grpc/*.pb.go
+# proto/*.pb.go ARE committed — regenerating requires protoc toolchain not everyone has
+# src-tauri/gen/ contains Tauri-generated Rust bindings — also committed
 src-tauri/gen/
 
 # ─── Parallax Sidecar Binaries ───────────────────────────────────────────────

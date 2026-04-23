@@ -325,15 +325,19 @@ pub async fn github_publish_docs(
     struct FileResp {
         sha: Option<String>,
     }
-    let existing_sha: Option<String> = client
+    let resp_opt = client
         .get(&file_url)
         .query(&[("ref", "gh-pages")])
         .header("Authorization", format!("Bearer {}", token))
         .header("User-Agent", "Parallax/1.0")
         .send()
         .await
-        .ok()
-        .and_then(|r| r.json::<FileResp>().ok().and_then(|f| f.sha));
+        .ok();
+        
+    let existing_sha = match resp_opt {
+        Some(r) => r.json::<FileResp>().await.ok().and_then(|f| f.sha),
+        None => None,
+    };
 
     let mut body = serde_json::json!({
         "message": format!("Update API docs — {}", chrono::Utc::now().format("%Y-%m-%d %H:%M:%S")),

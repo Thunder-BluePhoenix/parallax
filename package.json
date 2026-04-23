@@ -16,12 +16,17 @@
     "@tauri-apps/plugin-shell": "^2",
     "@types/papaparse": "^5.5.2",
     "handlebars": "^4.7.9",
-    "papaparse": "^5.5.3"
+    "js-yaml": "^4.1.1",
+    "monaco-editor": "^0.55.1",
+    "papaparse": "^5.5.3",
+    "to-json-schema": "^0.2.5"
   },
   "devDependencies": {
     "@sveltejs/vite-plugin-svelte": "^4",
     "@tauri-apps/cli": "^2",
+    "@types/js-yaml": "^4.0.9",
     "@types/node": "^25.6.0",
+    "@types/to-json-schema": "^0.2.4",
     "svelte": "^5",
     "vite": "^6"
   }

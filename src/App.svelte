@@ -3,6 +3,7 @@
   import Sidebar from "./lib/components/Sidebar/Sidebar.svelte";
   import BuilderMode from "./lib/components/RequestBuilder/BuilderMode.svelte";
   import DashboardMode from "./lib/components/Dashboard/DashboardMode.svelte";
+  import DesignMode from "./lib/components/Design/DesignMode.svelte";
   import CollectionRunner from "./lib/components/Runner/CollectionRunner.svelte";
   import { onMount } from "svelte";
   import { appMode, showRunner } from "./lib/stores/app.svelte";
@@ -23,9 +24,12 @@
     <Sidebar />
 
     <div class="main-content">
-      {#if isDashboard}
+      {#if appMode.value === "dashboard"}
         <div style="display:none">{console.log("[App] Rendering DashboardMode")}</div>
         <DashboardMode />
+      {:else if appMode.value === "design"}
+        <div style="display:none">{console.log("[App] Rendering DesignMode")}</div>
+        <DesignMode />
       {:else}
         <div style="display:none">{console.log("[App] Rendering BuilderMode")}</div>
         <BuilderMode />

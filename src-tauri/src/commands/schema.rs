@@ -55,3 +55,27 @@ pub fn list_frameworks() -> Vec<FrameworkInfo> {
 pub fn explore_schema(root_path: String) -> Result<ExplorerResult, String> {
     SchemaExplorer::explore(&root_path).map_err(|e| e.to_string())
 }
+
+#[tauri::command]
+pub fn save_design_spec(name: String, yaml: String, _app_handle: tauri::AppHandle) -> Result<(), String> {
+    use std::fs;
+    use std::path::PathBuf;
+    use tauri::Manager;
+    
+    // In a real app we'd get the current workspace path, but for now we'll use a local .parallax folder
+    // Or we can just use the app's current directory + .parallax/design
+    let mut path = std::env::current_dir().map_err(|e| e.to_string())?;
+    path.push(".parallax");
+    path.push("design");
+    
+    if !path.exists() {
+        fs::create_dir_all(&path).map_err(|e| e.to_string())?;
+    }
+    
+    let safe_name = name.to_lowercase().replace(" ", "-").replace("/", "-");
+    let file_name = format!("{}.openapi.yaml", safe_name);
+    path.push(file_name);
+    
+    fs::write(path, yaml).map_err(|e| e.to_string())?;
+    Ok(())
+}

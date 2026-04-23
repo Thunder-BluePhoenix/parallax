@@ -3,6 +3,7 @@
   import VisualizerIframe from "./VisualizerIframe.svelte";
   import { generateTests, repairRequest, aiStatus } from "../../stores/ai.svelte";
   import { currentRequestId } from "../../stores/app.svelte";
+  import { inferJsonSchema, inferTypeScript } from "../../utils/schema-inference";
 
   let showRepairPanel = $state(false);
   let repairError     = $state("");
@@ -11,8 +12,20 @@
     !!responseState.response && responseState.response.status >= 400
   );
 
-  let viewMode   = $state<"pretty" | "raw" | "headers" | "cookies" | "tests" | "history" | "visualize">("pretty");
+  let viewMode   = $state<"pretty" | "raw" | "headers" | "cookies" | "tests" | "history" | "visualize" | "schema">("pretty");
   let historyIdx = $state(0);
+
+  // Schema Inference state
+  let schemaType = $state<"json" | "ts">("json");
+  let inferredSchema = $derived.by(() => {
+    const json = responseState.response?.body?.json;
+    if (!json) return "";
+    if (schemaType === "json") {
+      return JSON.stringify(inferJsonSchema(json), null, 2);
+    } else {
+      return inferTypeScript(json, "Response");
+    }
+  });
 
   function statusClass(code: number) {
     if (code >= 500) return "status-5xx";
@@ -135,6 +148,13 @@
           {#if responseHistory.length > 0}
             <span class="test-badge">{responseHistory.length}</span>
           {/if}
+        </button>
+        <button
+          class="view-mode-btn"
+          class:active={viewMode === "schema"}
+          onclick={() => (viewMode = "schema")}
+        >
+          Schema
         </button>
         {#if visualizerData.template}
           <button
@@ -311,6 +331,31 @@
       {:else if viewMode === "visualize"}
         <div class="visualizer-wrapper">
           <VisualizerIframe />
+        </div>
+      {:else if viewMode === "schema"}
+        <div class="schema-viewer scroll-y animate-fade-in">
+          <div class="schema-toolbar">
+            <div class="schema-toggle">
+              <button class="toggle-btn" class:active={schemaType === "json"} onclick={() => schemaType = "json"}>JSON Schema</button>
+              <button class="toggle-btn" class:active={schemaType === "ts"} onclick={() => schemaType = "ts"}>TypeScript</button>
+            </div>
+            <div style="flex:1"></div>
+            <button class="ai-btn" onclick={() => {
+              navigator.clipboard.writeText(inferredSchema);
+              alert("Copied to clipboard!");
+            }}>
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+              Copy
+            </button>
+          </div>
+          <div class="schema-content mono">
+            {#each inferredSchema.split('\n') as line, i}
+              <div class="json-line">
+                <span class="line-num">{i + 1}</span>
+                <span class="line-content">{@html colorizeJsonLine(line)}</span>
+              </div>
+            {/each}
+          </div>
         </div>
       {/if}
     </div>
@@ -779,5 +824,48 @@
     padding: 10px 12px;
     font-size: 11px;
     color: var(--color-error);
+  }
+
+  /* ── Schema Viewer ────────────────────────────────────── */
+  .schema-viewer {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+  }
+
+  .schema-toolbar {
+    display: flex;
+    align-items: center;
+    padding: 8px 12px;
+    gap: 12px;
+    background: var(--bg-surface);
+    border-bottom: 1px solid var(--border-subtle);
+  }
+
+  .schema-toggle {
+    display: flex;
+    background: var(--bg-void);
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-sm);
+    padding: 2px;
+  }
+
+  .toggle-btn {
+    padding: 2px 8px;
+    font-size: 10px;
+    font-weight: 600;
+    color: var(--text-muted);
+    border-radius: 3px;
+    background: transparent;
+  }
+
+  .toggle-btn.active {
+    background: var(--bg-elevated);
+    color: var(--text-primary);
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+  }
+
+  .schema-content {
+    padding: 8px 0;
   }
 </style>

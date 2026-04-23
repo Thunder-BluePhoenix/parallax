@@ -35,9 +35,10 @@ pub fn run() {
             commands::auth::detect_framework,
             commands::auth::perform_auth,
             commands::auth::refresh_auth,
-            // Schema / Ecosystem Explorer
-            commands::schema::explore_schema,
+            // Ecosystem Schema Explorer (Phase 4.1 & 4.2)
             commands::schema::list_frameworks,
+            commands::schema::explore_schema,
+            commands::schema::save_design_spec,
             // Workspace
             commands::workspace::open_workspace,
             commands::workspace::create_workspace,

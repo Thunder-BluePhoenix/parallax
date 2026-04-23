@@ -8,7 +8,7 @@ const uuid = () => Math.random().toString(36).substring(2) + Date.now().toString
 // ============================================================
 // App Mode & Overlays
 // ============================================================
-export const appMode = $state<{ value: "builder" | "dashboard" }>({ value: "builder" });
+export const appMode = $state<{ value: "builder" | "dashboard" | "design" }>({ value: "builder" });
 export const showRunner = $state<{ value: boolean }>({ value: false });
 
 // ============================================================

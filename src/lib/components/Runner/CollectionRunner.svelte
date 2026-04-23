@@ -344,7 +344,7 @@
       <div class="config-divider"></div>
 
       <div class="config-group">
-        <label>Data File (CSV/JSON)</label>
+        <div class="faux-label">Data File (CSV/JSON)</div>
         {#if !dataFileName}
           <button class="btn-secondary" onclick={selectDataFile}>Select File</button>
         {:else}

@@ -1113,7 +1113,10 @@ var MockService_ServiceDesc = grpc.ServiceDesc{
 }
 
 const (
-	AIService_GenerateTests_FullMethodName = "/parallax.AIService/GenerateTests"
+	AIService_GenerateTests_FullMethodName    = "/parallax.AIService/GenerateTests"
+	AIService_RepairRequest_FullMethodName    = "/parallax.AIService/RepairRequest"
+	AIService_GenerateScript_FullMethodName   = "/parallax.AIService/GenerateScript"
+	AIService_CreateCollection_FullMethodName = "/parallax.AIService/CreateCollection"
 )
 
 // AIServiceClient is the client API for AIService service.
@@ -1125,6 +1128,9 @@ const (
 // =============================================================================
 type AIServiceClient interface {
 	GenerateTests(ctx context.Context, in *AITestRequest, opts ...grpc.CallOption) (*AITestResponse, error)
+	RepairRequest(ctx context.Context, in *AIRepairRequest, opts ...grpc.CallOption) (*AIRepairResponse, error)
+	GenerateScript(ctx context.Context, in *AIScriptRequest, opts ...grpc.CallOption) (*AIScriptResponse, error)
+	CreateCollection(ctx context.Context, in *AICollectionRequest, opts ...grpc.CallOption) (*AICollectionResponse, error)
 }
 
 type aIServiceClient struct {
@@ -1145,6 +1151,36 @@ func (c *aIServiceClient) GenerateTests(ctx context.Context, in *AITestRequest, 
 	return out, nil
 }
 
+func (c *aIServiceClient) RepairRequest(ctx context.Context, in *AIRepairRequest, opts ...grpc.CallOption) (*AIRepairResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(AIRepairResponse)
+	err := c.cc.Invoke(ctx, AIService_RepairRequest_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *aIServiceClient) GenerateScript(ctx context.Context, in *AIScriptRequest, opts ...grpc.CallOption) (*AIScriptResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(AIScriptResponse)
+	err := c.cc.Invoke(ctx, AIService_GenerateScript_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *aIServiceClient) CreateCollection(ctx context.Context, in *AICollectionRequest, opts ...grpc.CallOption) (*AICollectionResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(AICollectionResponse)
+	err := c.cc.Invoke(ctx, AIService_CreateCollection_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // AIServiceServer is the server API for AIService service.
 // All implementations must embed UnimplementedAIServiceServer
 // for forward compatibility.
@@ -1154,6 +1190,9 @@ func (c *aIServiceClient) GenerateTests(ctx context.Context, in *AITestRequest, 
 // =============================================================================
 type AIServiceServer interface {
 	GenerateTests(context.Context, *AITestRequest) (*AITestResponse, error)
+	RepairRequest(context.Context, *AIRepairRequest) (*AIRepairResponse, error)
+	GenerateScript(context.Context, *AIScriptRequest) (*AIScriptResponse, error)
+	CreateCollection(context.Context, *AICollectionRequest) (*AICollectionResponse, error)
 	mustEmbedUnimplementedAIServiceServer()
 }
 
@@ -1166,6 +1205,15 @@ type UnimplementedAIServiceServer struct{}
 
 func (UnimplementedAIServiceServer) GenerateTests(context.Context, *AITestRequest) (*AITestResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method GenerateTests not implemented")
+}
+func (UnimplementedAIServiceServer) RepairRequest(context.Context, *AIRepairRequest) (*AIRepairResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method RepairRequest not implemented")
+}
+func (UnimplementedAIServiceServer) GenerateScript(context.Context, *AIScriptRequest) (*AIScriptResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method GenerateScript not implemented")
+}
+func (UnimplementedAIServiceServer) CreateCollection(context.Context, *AICollectionRequest) (*AICollectionResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method CreateCollection not implemented")
 }
 func (UnimplementedAIServiceServer) mustEmbedUnimplementedAIServiceServer() {}
 func (UnimplementedAIServiceServer) testEmbeddedByValue()                   {}
@@ -1206,6 +1254,60 @@ func _AIService_GenerateTests_Handler(srv interface{}, ctx context.Context, dec 
 	return interceptor(ctx, in, info, handler)
 }
 
+func _AIService_RepairRequest_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(AIRepairRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AIServiceServer).RepairRequest(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: AIService_RepairRequest_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AIServiceServer).RepairRequest(ctx, req.(*AIRepairRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _AIService_GenerateScript_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(AIScriptRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AIServiceServer).GenerateScript(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: AIService_GenerateScript_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AIServiceServer).GenerateScript(ctx, req.(*AIScriptRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _AIService_CreateCollection_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(AICollectionRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AIServiceServer).CreateCollection(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: AIService_CreateCollection_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AIServiceServer).CreateCollection(ctx, req.(*AICollectionRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // AIService_ServiceDesc is the grpc.ServiceDesc for AIService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -1216,6 +1318,18 @@ var AIService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "GenerateTests",
 			Handler:    _AIService_GenerateTests_Handler,
+		},
+		{
+			MethodName: "RepairRequest",
+			Handler:    _AIService_RepairRequest_Handler,
+		},
+		{
+			MethodName: "GenerateScript",
+			Handler:    _AIService_GenerateScript_Handler,
+		},
+		{
+			MethodName: "CreateCollection",
+			Handler:    _AIService_CreateCollection_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

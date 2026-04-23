@@ -1,8 +1,15 @@
 <script lang="ts">
   import { responseState, responseHistory, testResults, visualizerData } from "../../stores/app.svelte";
   import VisualizerIframe from "./VisualizerIframe.svelte";
-  import { generateTests, aiStatus } from "../../stores/ai.svelte";
+  import { generateTests, repairRequest, aiStatus } from "../../stores/ai.svelte";
   import { currentRequestId } from "../../stores/app.svelte";
+
+  let showRepairPanel = $state(false);
+  let repairError     = $state("");
+
+  const isFailure = $derived(
+    !!responseState.response && responseState.response.status >= 400
+  );
 
   let viewMode   = $state<"pretty" | "raw" | "headers" | "cookies" | "tests" | "history" | "visualize">("pretty");
   let historyIdx = $state(0);
@@ -33,9 +40,23 @@
     try {
       const result = await generateTests(currentRequestId.value, responseState.response);
       console.log("AI Tests:", result);
-      alert("AI tests generated! (Auto-applying to editor is next)");
-    } catch (e) {
+      alert("AI tests generated! Check the Tests tab.");
+    } catch (e: any) {
       console.error(e);
+      alert("AI Error: " + e.toString());
+    }
+  }
+
+  async function handleRepairRequest() {
+    if (!responseState.response) return;
+    repairError = "";
+    showRepairPanel = false;
+    try {
+      await repairRequest(responseState.response);
+      showRepairPanel = true;
+    } catch (e: any) {
+      repairError = e.toString();
+      showRepairPanel = true;
     }
   }
 </script>
@@ -126,6 +147,48 @@
         {/if}
       </div>
     </div>
+
+    <!-- AI Action Bar: appears when response is loaded -->
+    <div class="ai-action-bar">
+      <button class="ai-btn" onclick={handleGenerateTests} disabled={aiStatus.busy}>
+        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+        {aiStatus.busy ? 'Thinking…' : 'Generate Tests'}
+      </button>
+      {#if isFailure}
+        <button class="ai-btn ai-repair-btn" onclick={handleRepairRequest} disabled={aiStatus.busy}>
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>
+          {aiStatus.busy ? 'Analysing…' : 'Diagnose with AI'}
+        </button>
+      {/if}
+    </div>
+
+    <!-- AI Repair Result -->
+    {#if showRepairPanel}
+      <div class="ai-repair-panel animate-fade-in">
+        {#if repairError}
+          <div class="repair-error">
+            <strong>AI Error:</strong> {repairError}
+          </div>
+        {:else if aiStatus.repairResult}
+          {@const r = aiStatus.repairResult}
+          <div class="repair-header">
+            <span class="repair-priority priority-{r.priority}">{r.priority.toUpperCase()}</span>
+            <span class="repair-diagnosis">{r.diagnosis}</span>
+            <button class="repair-close" onclick={() => (showRepairPanel = false)}>×</button>
+          </div>
+          {#if r.fixes?.length > 0}
+            <div class="repair-fixes">
+              {#each r.fixes as fix}
+                <div class="fix-item">
+                  <span class="fix-type">{fix.type}</span>
+                  <span class="fix-desc">{fix.description}</span>
+                </div>
+              {/each}
+            </div>
+          {/if}
+        {/if}
+      </div>
+    {/if}
 
     <!-- Response body -->
     <div class="response-body scroll-y">
@@ -600,4 +663,121 @@
   .history-body { flex: 1; }
   
   .visualizer-wrapper { flex: 1; height: 100%; display: flex; flex-direction: column; }
+
+  /* ── AI Action Bar ───────────────────────────────────── */
+  .ai-action-bar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 12px;
+    border-bottom: 1px solid var(--border-subtle);
+    background: var(--bg-void);
+    flex-shrink: 0;
+  }
+
+  .ai-btn {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 11px;
+    font-weight: 600;
+    padding: 4px 10px;
+    border-radius: var(--radius-sm);
+    background: var(--bg-elevated);
+    color: var(--text-secondary);
+    border: 1px solid var(--border-subtle);
+    cursor: pointer;
+    transition: var(--transition-fast);
+  }
+  .ai-btn:hover:not(:disabled) {
+    background: var(--accent-primary-dim);
+    color: var(--accent-primary);
+    border-color: var(--accent-primary);
+  }
+  .ai-btn:disabled { opacity: 0.45; cursor: not-allowed; }
+
+  .ai-repair-btn { color: var(--color-warning, #f59e0b); }
+  .ai-repair-btn:hover:not(:disabled) {
+    background: rgba(245, 158, 11, 0.12);
+    color: #f59e0b;
+    border-color: rgba(245, 158, 11, 0.4);
+  }
+
+  /* ── Repair Panel ────────────────────────────────────── */
+  .ai-repair-panel {
+    margin: 8px 12px;
+    border-radius: var(--radius-md);
+    border: 1px solid rgba(245, 158, 11, 0.3);
+    background: rgba(245, 158, 11, 0.05);
+    overflow: hidden;
+    flex-shrink: 0;
+  }
+
+  .repair-header {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    padding: 10px 12px;
+  }
+
+  .repair-priority {
+    font-size: 9px;
+    font-weight: 800;
+    letter-spacing: 0.05em;
+    padding: 2px 6px;
+    border-radius: 4px;
+    flex-shrink: 0;
+    margin-top: 1px;
+  }
+  .priority-high   { background: rgba(239,68,68,0.2);   color: #ef4444; }
+  .priority-medium { background: rgba(245,158,11,0.2);  color: #f59e0b; }
+  .priority-low    { background: rgba(74,222,128,0.15); color: #4ade80; }
+
+  .repair-diagnosis { flex: 1; font-size: 12px; color: var(--text-primary); line-height: 1.5; }
+
+  .repair-close {
+    background: transparent;
+    color: var(--text-muted);
+    font-size: 16px;
+    line-height: 1;
+    padding: 0 2px;
+    flex-shrink: 0;
+    cursor: pointer;
+  }
+  .repair-close:hover { color: var(--text-primary); }
+
+  .repair-fixes {
+    border-top: 1px solid rgba(245,158,11,0.2);
+    padding: 8px 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .fix-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    font-size: 11px;
+  }
+
+  .fix-type {
+    font-size: 9px;
+    font-weight: 700;
+    text-transform: uppercase;
+    padding: 1px 5px;
+    border-radius: 3px;
+    background: var(--bg-overlay);
+    color: var(--text-muted);
+    flex-shrink: 0;
+    margin-top: 1px;
+  }
+
+  .fix-desc { color: var(--text-secondary); line-height: 1.4; }
+
+  .repair-error {
+    padding: 10px 12px;
+    font-size: 11px;
+    color: var(--color-error);
+  }
 </style>

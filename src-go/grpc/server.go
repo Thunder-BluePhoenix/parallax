@@ -358,6 +358,62 @@ func (s *Server) GenerateTests(ctx context.Context, req *pb.AITestRequest) (*pb.
 	return &pb.AITestResponse{TestsJs: js, TestsYaml: yaml}, nil
 }
 
+func (s *Server) RepairRequest(ctx context.Context, req *pb.AIRepairRequest) (*pb.AIRepairResponse, error) {
+	cfg := req.Config
+	diagnosis, err := s.aiSvc.RepairRequest(ctx,
+		cfg.Model, cfg.Provider, cfg.ApiKey, cfg.BaseUrl,
+		req.Method, req.Url, req.RequestHeaders, req.RequestBody,
+		int(req.ResponseStatus), req.ResponseBody, req.EnvKeys,
+	)
+	if err != nil {
+		return nil, err
+	}
+	// Parse out fields from the JSON diagnosis string
+	var parsed struct {
+		Diagnosis string `json:"diagnosis"`
+		Priority  string `json:"priority"`
+		Fixes     []interface{} `json:"fixes"`
+	}
+	fixesJSON := "[]"
+	priority := "medium"
+	if err := json.Unmarshal([]byte(diagnosis), &parsed); err == nil {
+		if b, e := json.Marshal(parsed.Fixes); e == nil {
+			fixesJSON = string(b)
+		}
+		if parsed.Priority != "" {
+			priority = parsed.Priority
+		}
+		if parsed.Diagnosis != "" {
+			diagnosis = parsed.Diagnosis
+		}
+	}
+	return &pb.AIRepairResponse{Diagnosis: diagnosis, FixesJson: fixesJSON, Priority: priority}, nil
+}
+
+func (s *Server) GenerateScript(ctx context.Context, req *pb.AIScriptRequest) (*pb.AIScriptResponse, error) {
+	cfg := req.Config
+	script, err := s.aiSvc.GenerateScript(ctx,
+		cfg.Model, cfg.Provider, cfg.ApiKey, cfg.BaseUrl,
+		req.ScriptType, req.UserPrompt, req.Method, req.Url,
+	)
+	if err != nil {
+		return nil, err
+	}
+	return &pb.AIScriptResponse{Script: script}, nil
+}
+
+func (s *Server) CreateCollection(ctx context.Context, req *pb.AICollectionRequest) (*pb.AICollectionResponse, error) {
+	cfg := req.Config
+	yaml, err := s.aiSvc.CreateCollection(ctx,
+		cfg.Model, cfg.Provider, cfg.ApiKey, cfg.BaseUrl,
+		req.Description,
+	)
+	if err != nil {
+		return nil, err
+	}
+	return &pb.AICollectionResponse{CollectionYaml: yaml}, nil
+}
+
 // -----------------------------------------------------------------------------
 // WatcherService
 // -----------------------------------------------------------------------------

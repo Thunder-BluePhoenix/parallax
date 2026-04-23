@@ -69,6 +69,9 @@ pub fn run() {
             commands::watcher::watch_workspace,
             commands::watcher::unwatch_workspace,
             commands::ai::ai_generate_tests,
+            commands::ai::ai_repair_request,
+            commands::ai::ai_generate_script,
+            commands::ai::ai_create_collection,
         ])
         .manage(new_ws_state())
         .manage(new_sse_state())

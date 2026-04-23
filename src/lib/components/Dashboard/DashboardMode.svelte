@@ -8,6 +8,8 @@
   import LoadTestPanel from "./LoadTestPanel.svelte";
   import MockServerPanel from "./MockServerPanel.svelte";
   import AISettingsPanel from "../AI/AISettingsPanel.svelte";
+  // Force IDE refresh
+
 
   // Schema Explorer state
   let explorerPath = $state("");
@@ -317,97 +319,7 @@
     display: flex;
     flex-direction: column;
   }
-
-  /* Forms */
-  .config-row, .explorer-input {
-    display: flex;
-    gap: 8px;
-    margin-bottom: 16px;
-    align-items: flex-end;
-  }
-
-  .config-field { display: flex; flex-direction: column; gap: 4px; flex: 1; }
-  .config-field label { font-size: 10px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; }
-  .config-field.small { flex: 0 0 140px; }
-
-  .form-input {
-    height: 34px;
-    padding: 0 10px;
-    background: var(--bg-input);
-    border: 1px solid var(--border-default);
-    border-radius: var(--radius-md);
-    color: var(--text-primary);
-    font-size: 13px;
-  }
-  .form-input.flex-1 { flex: 1; }
-  .form-select {
-    height: 34px;
-    padding: 0 10px;
-    background: var(--bg-input);
-    border: 1px solid var(--border-default);
-    border-radius: var(--radius-md);
-    color: var(--text-primary);
-    font-size: 12px;
-    cursor: pointer;
-  }
-
-  .btn-action {
-    height: 34px;
-    padding: 0 16px;
-    background: var(--bg-elevated);
-    border: 1px solid var(--border-default);
-    color: var(--text-primary);
-    font-size: 12px;
-    font-weight: 600;
-    border-radius: var(--radius-md);
-    white-space: nowrap;
-    transition: var(--transition-fast);
-    cursor: pointer;
-  }
-  .btn-action:hover { border-color: var(--accent-primary); color: var(--accent-primary); }
-  .btn-action.danger:hover { border-color: var(--color-error); color: var(--color-error); }
-
-  /* Load test */
-  .loadtest-config {
-    background: var(--bg-surface);
-    border: 1px solid var(--border-default);
-    border-radius: var(--radius-lg);
-    padding: 16px;
-    margin-bottom: 16px;
-    display: flex;
-    flex-direction: column;
-    gap: 12px;
-  }
-
-  .stat-grid {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 8px;
-    margin-bottom: 16px;
-  }
-
-  .stat-card {
-    background: var(--bg-surface);
-    border: 1px solid var(--border-default);
-    border-radius: var(--radius-md);
-    padding: 12px;
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
-  }
-  .stat-label { font-size: 10px; text-transform: uppercase; color: var(--text-muted); font-weight: 600; }
-  .stat-value { font-size: 22px; font-family: var(--font-mono); font-weight: 700; color: var(--text-primary); }
-
-  .histogram-placeholder {
-    height: 120px;
-    background: var(--bg-surface);
-    border: 1px dashed var(--border-default);
-    border-radius: var(--radius-md);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 12px;
-  }
+  /* Ecosystem */
 
   /* Ecosystem */
   .ecosystem-grid {

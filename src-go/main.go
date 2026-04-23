@@ -12,16 +12,17 @@ import (
 	"syscall"
 	"encoding/json"
 
+	"github.com/bluephoenix/parallax-worker/ai"
 	"github.com/bluephoenix/parallax-worker/health"
 	"github.com/bluephoenix/parallax-worker/loadtest"
-	"github.com/bluephoenix/parallax-worker/proxy"
-	"github.com/bluephoenix/parallax-worker/watcher"
-	"github.com/bluephoenix/parallax-worker/grpc"
-	"github.com/bluephoenix/parallax-worker/storage"
+	"github.com/bluephoenix/parallax-worker/mcp"
 	"github.com/bluephoenix/parallax-worker/mock"
 	"github.com/bluephoenix/parallax-worker/models"
+	"github.com/bluephoenix/parallax-worker/proxy"
 	"github.com/bluephoenix/parallax-worker/runner"
-	"github.com/bluephoenix/parallax-worker/ai"
+	"github.com/bluephoenix/parallax-worker/storage"
+	"github.com/bluephoenix/parallax-worker/watcher"
+	grpcworker "github.com/bluephoenix/parallax-worker/grpc"
 	"path/filepath"
 	"strings"
 	"gopkg.in/yaml.v3"
@@ -32,6 +33,9 @@ var (
 	grpcPort  = flag.Int("grpc-port", 50151, "gRPC server port")
 	proxyPort = flag.Int("proxy-port", 8888, "Local HTTP proxy port")
 	mockPort  = flag.Int("mock-port", 9999, "Local Mock server port")
+	mcpPort   = flag.Int("mcp-port", 7676, "MCP server port (localhost only)")
+	mcpToken  = flag.String("mcp-token", "", "Bearer token for MCP auth (empty = no auth)")
+	mcpEnable = flag.Bool("mcp", false, "Enable MCP server")
 )
 
 func main() {
@@ -105,6 +109,31 @@ func main() {
 			log.Printf("Mock server error: %v", err)
 		}
 	}()
+
+	// Start MCP server (optional)
+	var mcpSrv *mcp.Server
+	if *mcpEnable {
+		mcpSrv = mcp.New(*mcpPort, *mcpToken)
+		// Wire service hooks so MCP tools can call into live subsystems
+		mcpSrv.SetTrafficGetter(func(limit int) []map[string]interface{} {
+			entries := proxySvc.GetTraffic(limit)
+			result := make([]map[string]interface{}, 0, len(entries))
+			for _, e := range entries {
+				result = append(result, map[string]interface{}{
+					"id": e.ID, "method": e.Method, "url": e.URL,
+					"status": e.StatusCode, "latency_ms": e.LatencyMs,
+					"timestamp_ms": e.Timestamp, "preview": e.Preview,
+				})
+			}
+			return result
+		})
+		go func() {
+			log.Printf("MCP server listening on localhost:%d", *mcpPort)
+			if err := mcpSrv.Start(); err != nil {
+				log.Printf("MCP server error: %v", err)
+			}
+		}()
+	}
 
 	// Graceful shutdown
 	quit := make(chan os.Signal, 1)

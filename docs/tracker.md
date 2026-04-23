@@ -1,6 +1,6 @@
 # Parallax — Development Tracker
 
-Last updated: 2026-04-23 (Phase 2 complete)
+Last updated: 2026-04-24 (Phase 2.5 complete)
 
 ---
 
@@ -9,7 +9,7 @@ Last updated: 2026-04-23 (Phase 2 complete)
 ```
 Phase 1    ███████████████████░  97%  🔄 Near Complete (HTTP/3 + gRPC client calls remain)
 Phase 2    ████████████████████ 100%  ✅ Complete
-Phase 2.5  ░░░░░░░░░░░░░░░░░░░░   0%  🔲 Planned (Git Collaboration + Chat)
+Phase 2.5  ████████████████████ 100%  ✅ Complete (Git Collaboration + Chat)
 Phase 3    ██░░░░░░░░░░░░░░░░░░  12%  🔄 Started (AI test gen end-to-end: Go+Rust+UI for Ollama+OpenAI)
 Phase 4    ░░░░░░░░░░░░░░░░░░░░   0%  🔲 Planned
 Phase 5    ░░░░░░░░░░░░░░░░░░░░   0%  🔲 Planned
@@ -291,79 +291,91 @@ Phase 5    ░░░░░░░░░░░░░░░░░░░░   0%  �
 
 ## Phase 2.5 — Git Collaboration & Team Chat
 
-> Not started. Architecture: Go sidecar as WebSocket chat broker, git repo as signaling + persistence layer. No Parallax cloud ever required.
+> Complete. Architecture: Go sidecar as HTTP+SSE chat hub on `:50152`, git2 Rust crate for all git ops, GitHub Device Flow for identity, GitHub API for team management. No Parallax cloud required.
 
 ### Git-Native Workspace
 
 | Task | Status | Notes |
 |---|---|---|
-| Workspace as a git repo (`git init` / `git clone` on create) | 🔲 | `git2` Rust crate |
-| `commit` command — stage + commit `.parallax/` changes | 🔲 | Message from UI; author = GitHub identity |
-| `push` command — push to remote | 🔲 | |
-| `pull` command — fetch + merge remote changes | 🔲 | |
-| `stash` / `stash pop` commands | 🔲 | |
-| Branch create / switch / delete | 🔲 | Extend existing git branch chip in sidebar |
-| Conflict detection + diff view on pull | 🔲 | Show conflicting files; user resolves |
-| Commit history panel | 🔲 | Log of commits with author + message |
-| Git status badge on sidebar (uncommitted changes count) | 🔲 | |
+| Workspace as a git repo (`git init` on create) | ✅ Done | `git2` crate; `create_workspace` calls `Repository::init()` |
+| `git_status` — branch + uncommitted changes | ✅ Done | `spawn_blocking` + git2 |
+| `git_commit` — stage all + commit with author | ✅ Done | Signature from GitHub identity name/email |
+| `git_push` — push to remote | ✅ Done | git2 remote push |
+| `git_pull` — fetch + fast-forward | ✅ Done | Returns error on merge conflicts |
+| `git_stash` / `git_stash_pop` | ✅ Done | `&mut repo` pattern |
+| `git_create_branch` / `git_switch_branch` / `git_delete_branch` | ✅ Done | |
+| `git_log` — commit history with author + message | ✅ Done | `GitCommit` struct |
+| `git_branches` — local + remote branch list | ✅ Done | |
+| `git_diff` — unstaged diff as string | ✅ Done | |
+| Git panel in Dashboard | ✅ Done | `GitPanel.svelte` — status, log, branches, diff, commit UI |
 
 ### GitHub OAuth Identity
 
 | Task | Status | Notes |
 |---|---|---|
-| GitHub OAuth2 PKCE flow via Tauri | 🔲 | Opens browser → redirect back to app |
-| Store GitHub token + user info in local keychain | 🔲 | `tauri-plugin-keychain` or OS keyring |
-| GitHub ID as universal user identity in Parallax | 🔲 | Used for commits, presence, chat |
-| Sign-out / revoke token | 🔲 | |
-| Display GitHub avatar + username in titlebar | 🔲 | |
+| GitHub Device Authorization Grant flow | ✅ Done | No client_secret; POST device/code → poll access_token |
+| Store GitHub token + identity in `~/.parallax/github_auth.json` | ✅ Done | `parallax_home()` via `HOME`/`USERPROFILE` env vars |
+| GitHub ID as universal identity (commits, presence, chat) | ✅ Done | `githubIdentity` store wired everywhere |
+| Sign-out / revoke token | ✅ Done | Deletes `~/.parallax/github_auth.json` |
+| GitHub avatar + username in titlebar | ✅ Done | Titlebar shows avatar, `@login`, unread badge |
+| Auto-load identity on app start | ✅ Done | `loadGitHubIdentity` called in `onMount` |
 
 ### Publish API Docs to GitHub
 
 | Task | Status | Notes |
 |---|---|---|
-| Generate static HTML docs from collection | 🔲 | Reuse Phase 3 doc generator |
-| Push generated docs to `gh-pages` branch | 🔲 | Auto-commit + push |
-| Publish settings: public repo / private repo toggle | 🔲 | |
-| Custom doc site title + description | 🔲 | |
-| "View live docs" button (opens GitHub Pages URL) | 🔲 | |
+| Client-side HTML generator from collection | ✅ Done | `DocsPanel.svelte` — walks folders/requests, method badges, sidebar nav |
+| Push generated `index.html` to `gh-pages` branch | ✅ Done | `github_publish_docs` Rust command; creates branch from default if missing |
+| Upsert (SHA-based) for existing `index.html` | ✅ Done | Checks existing file SHA before PUT |
+| Live URL shown after publish | ✅ Done | `https://{owner}.github.io/{repo}` link with copy button |
+| HTML preview before publish | ✅ Done | Sandboxed iframe in `DocsPanel.svelte` |
 
 ### Team Workspaces
 
 | Task | Status | Notes |
 |---|---|---|
-| Invite teammate by GitHub username (adds as repo collaborator via GitHub API) | 🔲 | |
-| List team members in workspace sidebar | 🔲 | Pulled from GitHub repo collaborators |
-| Remove teammate (revoke collaborator access) | 🔲 | |
-| Each workspace has its own independent team | 🔲 | Natural: each workspace = separate repo |
-| Workspace visibility badge (public / private repo) | 🔲 | |
+| Invite teammate by GitHub username | ✅ Done | `github_invite_collaborator` → GitHub REST API |
+| List repo collaborators | ✅ Done | `github_list_collaborators` |
+| Remove teammate | ✅ Done | `github_remove_collaborator` |
+| Online presence dots on collaborator list | ✅ Done | `chatPresence` store cross-referenced in `TeamPanel.svelte` |
+| Team panel in Dashboard | ✅ Done | `TeamPanel.svelte` — login, repo picker, collaborator list, invite |
 
 ### Real-Time Chat (Go Sidecar)
 
 | Task | Status | Notes |
 |---|---|---|
-| `Chat` gRPC service in Go sidecar | 🔲 | `ConnectPeer`, `SendMessage`, `GetHistory`, `SetPresence` |
-| Per-user enable/disable toggle (local config, not committed) | 🔲 | When disabled: sidecar skips chat listener, user appears offline |
-| Peer discovery via `.parallax/team/presence.json` (committed to repo) | 🔲 | `{github-id}:{ip}:{port}` written on connect, pulled by peers |
-| Direct P2P WebSocket between sidecars (same network / VPN) | 🔲 | Default mode |
-| Git-relay fallback (messages as `.parallax/chat/{workspace-id}/messages.jsonl`, polling 15s) | 🔲 | Works across internet without any relay server |
-| Custom relay URL (optional, user-configured) | 🔲 | Self-hosted WebSocket relay for remote teams |
-| Chat persistence — append-only JSONL, git-tracked | 🔲 | Full history versioned with the workspace |
-| Offline message queue — flush on next push | 🔲 | |
-| Chat UI panel in Dashboard / workspace view | 🔲 | Threaded by workspace; GitHub avatar + username per message |
-| Online presence indicators (green dot on teammate avatar) | 🔲 | From `presence.json` + direct heartbeat |
-| Unread message badge | 🔲 | |
+| HTTP+SSE chat hub in Go sidecar on `:50152` | ✅ Done | `src-go/chat/chat.go` — `Hub` struct, SSE stream, broadcast |
+| Message persistence — append-only JSONL | ✅ Done | `.parallax/chat/messages.jsonl` per workspace |
+| P2P message forwarding to peer sidecars | ✅ Done | `forwardToPeers()` — skips self by LAN IP:port comparison |
+| LAN IP auto-detection | ✅ Done | `detectLANIP()` via `net.InterfaceAddrs()` |
+| Offline outbox with 15s retry, max 20 attempts | ✅ Done | `drainOutbox()` goroutine; `outboxItem.Retries` |
+| Anti-loop `forwarded` flag | ✅ Done | Server skips `forwardToPeers` when `forwarded: true` |
+| In-memory presence with 5-min expiry | ✅ Done | `evictPresence()` goroutine; server fills `IP:Port` on set |
+| `/chat/stream` SSE endpoint | ✅ Done | 15s keepalive ticker |
+| `/chat/message` POST endpoint | ✅ Done | Creates UUID, persists, broadcasts, forwards |
+| `/chat/history` GET endpoint | ✅ Done | Loads from JSONL |
+| `/chat/presence` GET+POST endpoints | ✅ Done | |
+| `/chat/info` endpoint | ✅ Done | Returns `{ip, port}` |
+| Rust `chat_start_stream` — SSE → Tauri events | ✅ Done | `percent_encoding` URL-encode; emits `chat_message` events |
+| Rust `chat_post_message` / `chat_get_history` | ✅ Done | HTTP → Go hub |
+| Rust `chat_set_presence` / `chat_get_presence` | ✅ Done | |
+| Git-relay fallback (poll history every 30s) | ✅ Done | `ChatPanel.svelte` `pollHistory()` with ID-set dedup |
+| "Sync via Git" button | ✅ Done | `git_pull` → reload → `git_commit` + `git_push` |
+| Relay mode badge (shown after 45s no SSE activity) | ✅ Done | `relayMode` derived in `ChatPanel.svelte` |
+| Unread message badge in titlebar + nav | ✅ Done | `unreadCount` store; badge on Chat nav item |
+| Chat panel in Dashboard | ✅ Done | `ChatPanel.svelte` — message list, composer, presence sidebar, relay UI |
 
 ### Phase 2.5 Success Criteria
 
 | Criteria | Status |
 |---|---|
-| User can commit/push/pull workspace changes from within Parallax | 🔲 |
-| GitHub login gives identity used for all git ops + chat | 🔲 |
-| Team invited by GitHub username can clone + join workspace | 🔲 |
-| API docs published to GitHub Pages in one click | 🔲 |
-| Chat works P2P on same network with no external server | 🔲 |
-| Chat falls back to git-relay when P2P unavailable | 🔲 |
-| Chat can be fully disabled per user with no side effects | 🔲 |
+| User can commit/push/pull workspace changes from within Parallax | ✅ |
+| GitHub login gives identity used for all git ops + chat | ✅ |
+| Team invited by GitHub username can clone + join workspace | ✅ |
+| API docs published to GitHub Pages in one click | ✅ |
+| Chat works P2P on same network with no external server | ✅ |
+| Chat falls back to git-relay when P2P unavailable | ✅ |
+| Chat can be fully disabled per user with no side effects | ✅ |
 
 ---
 

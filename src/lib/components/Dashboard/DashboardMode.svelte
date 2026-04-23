@@ -11,6 +11,7 @@
   import GitPanel from "./GitPanel.svelte";
   import TeamPanel from "./TeamPanel.svelte";
   import ChatPanel from "./ChatPanel.svelte";
+  import DocsPanel from "./DocsPanel.svelte";
   import { unreadCount } from "../../stores/github.svelte";
 
 
@@ -24,7 +25,7 @@
     return fn ? (fn as any)(cmd, args) : Promise.reject("Tauri invoke not found");
   };
 
-  let activeSection = $state<"health" | "loadtest" | "proxy" | "mock" | "history" | "ecosystem" | "ai_settings" | "git" | "team" | "chat">("health");
+  let activeSection = $state<"health" | "loadtest" | "proxy" | "mock" | "history" | "ecosystem" | "ai_settings" | "git" | "team" | "chat" | "docs">("health");
   let workerConnected = $state(false);
 
   const sections = [
@@ -38,6 +39,7 @@
     { id: "git", label: "Git", icon: "⎇" },
     { id: "team", label: "Team", icon: "👥" },
     { id: "chat", label: "Chat", icon: "💬", badge: true },
+    { id: "docs", label: "API Docs", icon: "📄" },
   ] as const;
 
   // Run history stats
@@ -163,6 +165,9 @@
 
     {:else if activeSection === "chat"}
       <ChatPanel />
+
+    {:else if activeSection === "docs"}
+      <DocsPanel />
 
     {:else if activeSection === "history"}
       <div class="dashboard-section animate-fade-in">

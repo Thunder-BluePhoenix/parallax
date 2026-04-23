@@ -1,5 +1,6 @@
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
+use git2;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct WorkspaceInfo {
@@ -60,6 +61,21 @@ pub async fn create_workspace(path: String) -> Result<(), String> {
     let globals = r#"{"name":"globals","variables":{}}"#;
     std::fs::write(parallax_dir.join("environments").join("globals.json"), globals)
         .map_err(|e| e.to_string())?;
+
+    // Write workspace.yaml with git author placeholders
+    let name = root.file_name()
+        .and_then(|n| n.to_str())
+        .unwrap_or("workspace");
+    let workspace_yaml = format!(
+        "name: {}\nremote: \"\"\ngit_author_name: \"\"\ngit_author_email: \"\"\n",
+        name
+    );
+    let _ = std::fs::write(parallax_dir.join("workspace.yaml"), workspace_yaml);
+
+    // Initialize git repo (non-fatal — workspace still works without it)
+    if let Err(e) = git2::Repository::init(&root) {
+        eprintln!("[workspace] git init failed: {}", e);
+    }
 
     Ok(())
 }

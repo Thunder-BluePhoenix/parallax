@@ -13,6 +13,7 @@ import (
 	"encoding/json"
 
 	"github.com/bluephoenix/parallax-worker/ai"
+	"github.com/bluephoenix/parallax-worker/chat"
 	"github.com/bluephoenix/parallax-worker/health"
 	"github.com/bluephoenix/parallax-worker/loadtest"
 	"github.com/bluephoenix/parallax-worker/mcp"
@@ -109,6 +110,9 @@ func main() {
 			log.Printf("Mock server error: %v", err)
 		}
 	}()
+
+	// Start team chat HTTP+SSE server
+	go chat.Start(50152)
 
 	// Start MCP server (optional)
 	var mcpSrv *mcp.Server

@@ -13,3 +13,6 @@ pub mod loadtest;
 pub mod mock;
 pub mod ai;
 pub mod watcher;
+pub mod git;
+pub mod github;
+pub mod chat;

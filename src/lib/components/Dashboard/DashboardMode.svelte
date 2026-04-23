@@ -8,7 +8,10 @@
   import LoadTestPanel from "./LoadTestPanel.svelte";
   import MockServerPanel from "./MockServerPanel.svelte";
   import AISettingsPanel from "../AI/AISettingsPanel.svelte";
-  // Force IDE refresh
+  import GitPanel from "./GitPanel.svelte";
+  import TeamPanel from "./TeamPanel.svelte";
+  import ChatPanel from "./ChatPanel.svelte";
+  import { unreadCount } from "../../stores/github.svelte";
 
 
   // Schema Explorer state
@@ -21,7 +24,7 @@
     return fn ? (fn as any)(cmd, args) : Promise.reject("Tauri invoke not found");
   };
 
-  let activeSection = $state<"health" | "loadtest" | "proxy" | "mock" | "history" | "ecosystem" | "ai_settings">("health");
+  let activeSection = $state<"health" | "loadtest" | "proxy" | "mock" | "history" | "ecosystem" | "ai_settings" | "git" | "team" | "chat">("health");
   let workerConnected = $state(false);
 
   const sections = [
@@ -32,6 +35,9 @@
     { id: "history", label: "Run History", icon: "🕒" },
     { id: "ai_settings", label: "AI Settings", icon: "🧠" },
     { id: "ecosystem", label: "Ecosystem", icon: "🔌" },
+    { id: "git", label: "Git", icon: "⎇" },
+    { id: "team", label: "Team", icon: "👥" },
+    { id: "chat", label: "Chat", icon: "💬", badge: true },
   ] as const;
 
   // Run history stats
@@ -125,6 +131,8 @@
         <span>{section.label}</span>
         {#if section.id === "health"}
           <span class="status-dot {workerConnected ? 'up' : 'down'}" title={workerConnected ? "Worker running" : "Worker down"}></span>
+        {:else if section.id === "chat" && unreadCount.value > 0}
+          <span class="nav-badge">{unreadCount.value}</span>
         {/if}
       </button>
     {/each}
@@ -146,6 +154,15 @@
 
     {:else if activeSection === "ai_settings"}
       <AISettingsPanel />
+
+    {:else if activeSection === "git"}
+      <GitPanel />
+
+    {:else if activeSection === "team"}
+      <TeamPanel />
+
+    {:else if activeSection === "chat"}
+      <ChatPanel />
 
     {:else if activeSection === "history"}
       <div class="dashboard-section animate-fade-in">
@@ -227,6 +244,43 @@
               <div class="result-header">
                 <span class="framework-badge">{explorationResult.framework.toUpperCase()} Detected</span>
                 <span class="entity-count">{explorationResult.entities.length} Entities Found</span>
+                <button class="btn-send" style="margin-left: auto; padding: 4px 12px; font-size: 11px;" onclick={async () => {
+                  try {
+                    const collectionName = explorationResult.framework.charAt(0).toUpperCase() + explorationResult.framework.slice(1) + " API";
+                    let folders = [];
+                    for (const entity of explorationResult.entities) {
+                      let entityRequests = [];
+                      for (const ep of entity.endpoints) {
+                        entityRequests.push({
+                          id: "req_" + Math.random().toString(36).substr(2, 9),
+                          name: `${ep.method} ${entity.name}`,
+                          method: ep.method,
+                          url: "{{base_url}}" + ep.path,
+                          headers: { "Content-Type": "application/json" },
+                          params: {},
+                          body: { type: ep.method === "GET" || ep.method === "DELETE" ? "none" : "json", content: "{\n}", raw: "{\n}" },
+                          auth: { type: "ecosystem_provider", provider: explorationResult.framework },
+                          scripts: null
+                        });
+                      }
+                      folders.push({ name: entity.name, requests: entityRequests });
+                    }
+                    const newCollection = {
+                      name: collectionName,
+                      version: "1.0.0",
+                      description: `Auto-generated from ${explorationResult.root_path}`,
+                      requests: [],
+                      folders: folders,
+                      variables: { "base_url": "http://localhost:8000" }
+                    };
+                    await invoke("save_collection", { collection: newCollection });
+                    alert("Collection generated! Switch to Builder mode to use it.");
+                  } catch (e) {
+                    alert("Failed to save collection: " + e);
+                  }
+                }}>
+                  Generate Collection
+                </button>
               </div>
               <div class="entity-scroll">
                 {#each explorationResult.entities as entity}
@@ -295,6 +349,13 @@
   .nav-item.active { background: var(--accent-primary-dim); color: var(--accent-primary); }
 
   .nav-icon { font-size: 14px; }
+
+  .nav-badge {
+    margin-left: auto;
+    background: var(--color-error); color: white;
+    font-size: 9px; font-weight: 700;
+    padding: 1px 5px; border-radius: 10px; min-width: 16px; text-align: center;
+  }
 
   .status-dot {
     width: 6px;

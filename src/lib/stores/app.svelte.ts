@@ -46,7 +46,7 @@ export interface AuthState {
   token: string; username: string; password: string;
   apiKeyHeader: string; apiKeyValue: string;
   apiKeyLocation: "header" | "query";
-  provider: string; providerSession: any | null;
+  provider: string; authUrl: string; providerSession: any | null;
 }
 export interface RequestState {
   id: string; name: string; method: HttpMethod; url: string;
@@ -58,7 +58,7 @@ export interface RequestState {
 export function defaultAuth(): AuthState {
   return { type: "none", token: "", username: "", password: "",
            apiKeyHeader: "X-API-Key", apiKeyValue: "", apiKeyLocation: "header",
-           provider: "frappe", providerSession: null };
+           provider: "frappe", authUrl: "", providerSession: null };
 }
 
 export const activeRequest = $state<RequestState>({

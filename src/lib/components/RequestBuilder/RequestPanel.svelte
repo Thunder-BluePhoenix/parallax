@@ -269,6 +269,16 @@
               <option value="fastapi">FastAPI (OAuth2)</option>
               <option value="generic">Generic Bearer</option>
             </select>
+            
+            <label for="auth-base-url" class="field-label mt">Base/Login URL</label>
+            <input id="auth-base-url" class="mono" type="text" placeholder="http://localhost:8000" bind:value={activeRequest.auth.authUrl} />
+            
+            <label for="auth-ecosystem-user" class="field-label mt">Username/Email</label>
+            <input id="auth-ecosystem-user" type="text" placeholder="user@example.com" bind:value={activeRequest.auth.username} />
+            
+            <label for="auth-ecosystem-pass" class="field-label mt">Password/Secret</label>
+            <input id="auth-ecosystem-pass" type="password" placeholder="Password" bind:value={activeRequest.auth.password} />
+
             <p class="helper-text">
               Parallax will auto-handle CSRF tokens, session cookies, and auth headers for the selected framework.
             </p>
@@ -279,8 +289,31 @@
                 </svg>
                 Session active
               </div>
+              <button class="btn" style="margin-top: 8px; width: 100%; justify-content: center;" onclick={() => activeRequest.auth.providerSession = null}>
+                Clear Session
+              </button>
             {:else}
-              <button class="btn-send" style="margin-top: 12px; width: 100%; justify-content: center;">
+              <button 
+                class="btn-send" 
+                style="margin-top: 12px; width: 100%; justify-content: center;"
+                onclick={async () => {
+                  try {
+                    const session = await invoke("perform_auth", {
+                      input: {
+                        provider: activeRequest.auth.provider,
+                        credentials: {
+                          base_url: activeRequest.auth.authUrl || "http://localhost:8000",
+                          username: activeRequest.auth.username,
+                          password: activeRequest.auth.password,
+                        }
+                      }
+                    });
+                    activeRequest.auth.providerSession = session;
+                  } catch (e) {
+                    alert("Authentication failed: " + e);
+                  }
+                }}
+              >
                 Authenticate
               </button>
             {/if}

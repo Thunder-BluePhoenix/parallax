@@ -72,6 +72,35 @@ pub fn run() {
             commands::ai::ai_repair_request,
             commands::ai::ai_generate_script,
             commands::ai::ai_create_collection,
+            // Git (Phase 2.5)
+            commands::git::git_init,
+            commands::git::git_status,
+            commands::git::git_commit,
+            commands::git::git_push,
+            commands::git::git_pull,
+            commands::git::git_stash,
+            commands::git::git_stash_pop,
+            commands::git::git_branches,
+            commands::git::git_create_branch,
+            commands::git::git_checkout_branch,
+            commands::git::git_log,
+            commands::git::git_diff,
+            commands::git::git_set_remote,
+            // GitHub OAuth + API (Phase 2.5)
+            commands::github::github_device_auth_start,
+            commands::github::github_device_auth_poll,
+            commands::github::github_get_identity,
+            commands::github::github_sign_out,
+            commands::github::github_list_collaborators,
+            commands::github::github_invite_collaborator,
+            commands::github::github_remove_collaborator,
+            commands::github::github_publish_docs,
+            // Chat bridge (Phase 2.5)
+            commands::chat::chat_send_message,
+            commands::chat::chat_get_history,
+            commands::chat::chat_set_presence,
+            commands::chat::chat_get_presence,
+            commands::chat::chat_start_stream,
         ])
         .manage(new_ws_state())
         .manage(new_sse_state())

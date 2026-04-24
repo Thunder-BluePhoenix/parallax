@@ -4,9 +4,23 @@ pub mod auth_providers;
 pub mod schema_explorer;
 pub mod commands;
 
+use std::collections::HashMap;
+use std::sync::Mutex;
 use tauri_plugin_shell::ShellExt;
 use commands::websocket::new_ws_state;
 use commands::sse::new_sse_state;
+
+/// Shared Tauri application state
+pub struct AppState {
+    /// In-flight request abort handles keyed by request ID
+    pub pending_requests: Mutex<HashMap<String, tokio::task::AbortHandle>>,
+}
+
+impl AppState {
+    pub fn new() -> Self {
+        Self { pending_requests: Mutex::new(HashMap::new()) }
+    }
+}
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -19,6 +33,10 @@ pub fn run() {
             // HTTP Engine
             commands::http::send_request,
             commands::http::cancel_request,
+            // gRPC
+            commands::grpc::grpc_unary,
+            // File utilities
+            commands::workspace::read_file_for_template,
             // Persistence
             commands::collections::list_collections,
             commands::collections::load_collection,
@@ -103,6 +121,7 @@ pub fn run() {
             commands::chat::chat_get_presence,
             commands::chat::chat_start_stream,
         ])
+        .manage(AppState::new())
         .manage(new_ws_state())
         .manage(new_sse_state())
         .setup(|app| {

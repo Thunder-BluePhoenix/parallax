@@ -20,6 +20,16 @@ pub struct ParallaxRequest {
     pub timeout_ms: Option<u64>,
     pub follow_redirects: Option<bool>,
     pub scripts: Option<RequestScripts>,
+    /// Skip TLS certificate verification (insecure — dev only)
+    pub tls_skip_verify: Option<bool>,
+    /// HTTP/HTTPS proxy URL e.g. "http://127.0.0.1:8888"
+    pub proxy_url: Option<String>,
+    /// PEM-encoded client certificate for mTLS
+    pub client_cert_pem: Option<String>,
+    /// PEM-encoded client private key for mTLS
+    pub client_key_pem: Option<String>,
+    /// Disable the cookie jar for this request
+    pub disable_cookies: Option<bool>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -129,6 +139,47 @@ impl HttpEngine {
             .cookie_store(true)
             .build()?;
         Ok(Self { client })
+    }
+
+    /// Build an engine customised for a specific request's TLS/proxy/cert/cookie config.
+    /// Falls back to the default engine when no special config is present.
+    pub fn build_for_request(req: &ParallaxRequest) -> Result<Self> {
+        let needs_custom = req.tls_skip_verify.unwrap_or(false)
+            || req.proxy_url.is_some()
+            || req.client_cert_pem.is_some()
+            || req.disable_cookies.unwrap_or(false);
+
+        if !needs_custom {
+            return Self::new();
+        }
+
+        let mut builder = Client::builder()
+            .user_agent("Parallax/0.1.0 (API Super-Client)")
+            .timeout(Duration::from_secs(30))
+            .gzip(true)
+            .brotli(true);
+
+        if !req.disable_cookies.unwrap_or(false) {
+            builder = builder.cookie_store(true);
+        }
+
+        if req.tls_skip_verify.unwrap_or(false) {
+            builder = builder.danger_accept_invalid_certs(true);
+        }
+
+        if let Some(proxy_url) = &req.proxy_url {
+            let proxy = reqwest::Proxy::all(proxy_url).map_err(|e| anyhow::anyhow!(e))?;
+            builder = builder.proxy(proxy);
+        }
+
+        if let (Some(cert_pem), Some(key_pem)) = (&req.client_cert_pem, &req.client_key_pem) {
+            let combined = format!("{}\n{}", cert_pem, key_pem);
+            let identity = reqwest::Identity::from_pem(combined.as_bytes())
+                .map_err(|e| anyhow::anyhow!(e))?;
+            builder = builder.identity(identity);
+        }
+
+        Ok(Self { client: builder.build()? })
     }
 
     /// Resolve environment variables in a string ({{var}} syntax)

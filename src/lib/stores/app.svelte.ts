@@ -40,7 +40,7 @@ export const loadedCollections = $state<Collection[]>([]);
 // ============================================================
 // Request state
 // ============================================================
-export type HttpMethod = "GET" | "POST" | "PUT" | "PATCH" | "DELETE" | "HEAD" | "OPTIONS" | "WS" | "SSE";
+export type HttpMethod = "GET" | "POST" | "PUT" | "PATCH" | "DELETE" | "HEAD" | "OPTIONS" | "WS" | "SSE" | "GRPC";
 export interface AuthState {
   type: "none" | "bearer" | "basic" | "api_key" | "ecosystem_provider";
   token: string; username: string; password: string;
@@ -263,6 +263,43 @@ export function parseCurl(raw: string): Partial<RequestState> | null {
 // ============================================================
 // Send Request
 // ============================================================
+// ============================================================
+// File-tag pre-processor (handles {% file '/path' %} before template engine)
+// ============================================================
+async function resolveFileTags(text: string): Promise<string> {
+  const re = /\{%\s*file\s+['"]([^'"]+)['"]\s*%\}/g;
+  const matches = [...text.matchAll(re)];
+  let result = text;
+  for (const m of matches) {
+    try {
+      const content = await invoke<string>("read_file_for_template", { path: m[1] });
+      result = result.replace(m[0], content);
+    } catch { /* leave the tag as-is if file unreadable */ }
+  }
+  return result;
+}
+
+async function resolveFileTagsInObj(obj: any): Promise<any> {
+  if (typeof obj === "string") return resolveFileTags(obj);
+  if (Array.isArray(obj)) return Promise.all(obj.map(resolveFileTagsInObj));
+  if (obj && typeof obj === "object") {
+    const out: any = {};
+    for (const [k, v] of Object.entries(obj)) out[k] = await resolveFileTagsInObj(v);
+    return out;
+  }
+  return obj;
+}
+
+// ============================================================
+// Cancel active request
+// ============================================================
+export async function cancelRequest() {
+  const id = activeRequest.id;
+  try { await invoke("cancel_request", { requestId: id }); } catch { /* ignore */ }
+  responseState.loading = false;
+  responseState.error   = "Request cancelled";
+}
+
 export async function sendRequest() {
   if (!activeRequest.url) return;
   const raw = activeRequest.url.trim();
@@ -308,7 +345,8 @@ export async function sendRequest() {
       await runPreRequestScript(activeScripts.preRequest, mergedEnv);
     }
 
-    const payload = resolveRequestTemplates(buildPayload(), mergedEnv, { ...responseCache });
+    const rawPayload = await resolveFileTagsInObj(buildPayload());
+    const payload = resolveRequestTemplates(rawPayload, mergedEnv, { ...responseCache });
 
     const result = await invoke<any>("send_request", {
       request:     payload,

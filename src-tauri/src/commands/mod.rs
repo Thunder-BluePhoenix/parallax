@@ -16,3 +16,4 @@ pub mod watcher;
 pub mod git;
 pub mod github;
 pub mod chat;
+pub mod grpc;

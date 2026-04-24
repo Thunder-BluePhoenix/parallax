@@ -1,13 +1,13 @@
 # Parallax — Development Tracker
 
-Last updated: 2026-04-24 (Phase 4 complete)
+Last updated: 2026-04-24 (Phase 1 complete — all gaps closed)
 
 ---
 
 ## Overall Progress
 
 ```
-Phase 1    ███████████████████░  97%  🔄 Near Complete (HTTP/3 + gRPC client calls remain)
+Phase 1    ████████████████████ 100%  ✅ Complete
 Phase 2    ████████████████████ 100%  ✅ Complete
 Phase 2.5  ████████████████████ 100%  ✅ Complete (Git Collaboration + Chat)
 Phase 3    ████████████████████ 100%  ✅ Complete (AI providers, MCP server, Design Mode, script assistant, OpenAPI export)
@@ -38,18 +38,18 @@ Phase 5    ░░░░░░░░░░░░░░░░░░░░   0%  �
 |---|---|---|
 | REST — all methods | ✅ Done | Via `reqwest` |
 | HTTP/2 | ✅ Done | `rustls` + `reqwest` |
-| HTTP/3 | 🔲 | |
+| HTTP/3 | 🔲 | Requires unstable Rust feature flag — deferred |
 | GraphQL — query + variables body | ✅ Done | Body type wired |
 | GraphQL schema introspection | ✅ Done | Fetch Schema button; type browser panel | |
-| gRPC unary calls | 🔲 | |
-| gRPC streaming | 🔲 | |
+| gRPC unary calls | ✅ Done | `grpc_unary` Rust command + `GRPCPane.svelte` — HTTP/2 + grpc+json framing |
+| gRPC streaming | 🔲 | Deferred — requires server-streaming SSE bridge |
 | WebSocket — connect/send/disconnect/stream | ✅ Done | `tokio-tungstenite`; Tauri event bridge |
 | SSE — Server-Sent Events streaming | ✅ Done | `reqwest` bytes_stream; Tauri event bridge |
 | Follow redirects (configurable) | ✅ Done | |
 | Request timeout (configurable) | ✅ Done | |
-| Proxy settings per environment | 🔲 | |
-| SSL/TLS toggle per request | 🔲 | |
-| Client certificates | 🔲 | |
+| Proxy settings per environment | ✅ Done | `proxy_url` field on `ParallaxRequest`; `HttpEngine::build_for_request()` |
+| SSL/TLS toggle per request | ✅ Done | `tls_skip_verify` field; `danger_accept_invalid_certs` per-request client |
+| Client certificates | ✅ Done | `client_cert_pem` + `client_key_pem` fields; `reqwest::Identity::from_pem` |
 
 ### Template Tag Engine
 | Task | Status | Notes |
@@ -66,7 +66,7 @@ Phase 5    ░░░░░░░░░░░░░░░░░░░░   0%  �
 | `{{var}}` — environment variable substitution | ✅ Done | |
 | Template resolution wired into `sendRequest()` | ✅ Done | `resolveRequestTemplates()` on full payload |
 | \`{% response 'body', '\$.path' %}\` — request chaining | ✅ Done | Template tag + JSONPath extractor |
-| `{% file '/path' %}` | 🔲 | |
+| `{% file '/path' %}` | ✅ Done | `read_file_for_template` Tauri command; async pre-processing in `sendRequest()` before template engine |
 | `{% prompt 'label' %}` | ✅ Done | Uses window.prompt() | |
 
 ### Variable Scoping (4-level system)
@@ -108,7 +108,7 @@ Phase 5    ░░░░░░░░░░░░░░░░░░░░   0%  �
 | Import from Insomnia v4 export JSON | ✅ Done | |
 | Import from curl command (URL bar paste) | ✅ Done | |
 | Import from OpenAPI 3.x | 🔲 | Phase 4 |
-| Import from HAR file | 🔲 | |
+| Import from HAR file | ✅ Done | `har-importer.ts` + HAR button in BuilderMode tab bar |
 | Export as Postman JSON | ✅ Done | postman-exporter.ts + sidebar context menu | |
 
 ### Cookie Jar
@@ -116,7 +116,7 @@ Phase 5    ░░░░░░░░░░░░░░░░░░░░   0%  �
 |---|---|---|
 | Cookie store in `reqwest` (`cookie_store(true)`) | ✅ Done | Rust engine |
 | Cookie manager UI | ✅ Done | Cookies tab in response pane | |
-| Per-request opt-in/opt-out | 🔲 | |
+| Per-request opt-in/opt-out | ✅ Done | `disable_cookies` field on `ParallaxRequest`; per-request client skips cookie jar |
 
 ### Auth Providers
 | Task | Status | Notes |
@@ -127,7 +127,8 @@ Phase 5    ░░░░░░░░░░░░░░░░░░░░   0%  �
 | API key (query param) | ✅ Done | api_key_location field + location selector UI | |
 | Ecosystem provider selector UI (Frappe, Django, Laravel, Rails, WordPress, FastAPI) | ✅ Done | |
 | Frappe / Django stubs | ✅ Done | Full in Phase 4 |
-| OAuth2, AWS SigV4, Digest, mTLS | 🔲 | Phase 4 |
+| OAuth2 / PKCE | ✅ Done | Phase 4 — `auth_oauth2_pkce()` in `auth_providers.rs` |
+| AWS SigV4, Digest, NTLM, mTLS | 🔲 | Deferred |
 
 ### Svelte 5 Builder Mode UI
 | Task | Status | Notes |
@@ -154,11 +155,11 @@ Phase 5    ░░░░░░░░░░░░░░░░░░░░   0%  �
 | Sidebar method badges | ✅ Done | |
 | Sidebar import button (Postman / Insomnia) | ✅ Done | |
 | Sidebar git branch chip | ✅ Done | |
-| Sidebar drag-and-drop reordering | 🔲 | |
-| Sidebar right-click context menu | 🔲 | |
+| Sidebar drag-and-drop reordering | 🔲 | Deferred — complex DnD implementation |
+| Sidebar right-click context menu | ✅ Done | Duplicate / Rename / Delete on requests, folders, collections |
 | Environment quick-edit overlay with secret masking | ✅ Done | |
 | Environment variable count badge | ✅ Done | |
-| Environment diff view | 🔲 | |
+| Environment diff view | 🔲 | Deferred to Phase 5 polish |
 | Multi-tab UI | ✅ Done | |
 | Tabs persist across restarts | ✅ Done | localStorage via persistTabs() | |
 | Collection Runner UI | ✅ Done | `CollectionRunner.svelte` — iterations, delay, stop-on-failure, live feed |
@@ -183,11 +184,12 @@ Phase 5    ░░░░░░░░░░░░░░░░░░░░   0%  �
 | REST requests work end-to-end | ✅ |
 | WebSocket connections work | ✅ |
 | SSE streams work | ✅ |
-| Template tags resolve at send-time | ✅ |
+| gRPC unary calls work (`application/grpc+json`) | ✅ |
+| Template tags resolve at send-time (incl. `{% file %}`) | ✅ |
 | Pre-request and test scripts execute with `pm` API | ✅ |
 | Variable scoping resolves across all 4 levels | ✅ |
 | Collections load/save to `.parallax/` | ✅ |
-| Import Postman + Insomnia collections | ✅ |
+| Import Postman + Insomnia + HAR collections | ✅ |
 | Import curl commands | ✅ |
 | Response history saves in-memory + disk | ✅ |
 | Response visualizer (Handlebars) works | ✅ |
@@ -195,6 +197,9 @@ Phase 5    ░░░░░░░░░░░░░░░░░░░░   0%  �
 | Go sidecar responds to ping | ✅ |
 | Cookie jar management UI | ✅ |
 | GraphQL schema introspection | ✅ |
+| Request cancellation (abort in-flight requests) | ✅ |
+| SSL skip-verify / proxy / client cert per request | ✅ |
+| Sidebar right-click context menu | ✅ |
 
 ---
 

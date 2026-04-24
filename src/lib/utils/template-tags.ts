@@ -122,6 +122,9 @@ function resolveTag(
       const result  = window.prompt(label, defVal);
       return result ?? defVal;
     }
+    // {% file '/path/to/file' %} — resolved async before this runs; if still present, leave as-is
+    case "file":
+      return `{% file ${parts[1] ?? ""} %}`;
     default:
       return `{% ${inner} %}`; // unknown tag — leave as-is
   }

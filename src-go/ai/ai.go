@@ -100,10 +100,9 @@ Return a JSON object with a single "yaml" field containing a valid Parallax coll
 
 func (s *AIService) callProvider(ctx context.Context, provider, apiKey, baseUrl, model, prompt string) (string, string, error) {
 	var result struct {
-		JS     string `json:"js"`
-		YAML   string `json:"yaml"`
-		Script string `json:"script"`
-		XYAML  string `json:"yaml"`
+		JS        string `json:"js"`
+		YAML      string `json:"yaml"`
+		Script    string `json:"script"`
 		Diagnosis string `json:"diagnosis"`
 	}
 

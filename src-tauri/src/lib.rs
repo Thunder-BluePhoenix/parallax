@@ -16,6 +16,10 @@ pub struct AppState {
     pub pending_requests: Mutex<HashMap<String, tokio::task::AbortHandle>>,
 }
 
+impl Default for AppState {
+    fn default() -> Self { Self::new() }
+}
+
 impl AppState {
     pub fn new() -> Self {
         Self { pending_requests: Mutex::new(HashMap::new()) }

@@ -390,13 +390,12 @@ impl HttpEngine {
                 let pass = Self::resolve_env(pass, env);
                 return builder.basic_auth(user, Some(pass));
             }
-            AuthType::ApiKey => {
-                if auth.api_key_location.as_deref() != Some("query") {
-                    if let (Some(header), Some(value)) = (&auth.api_key_header, &auth.api_key_value) {
-                        let header = Self::resolve_env(header, env);
-                        let value = Self::resolve_env(value, env);
-                        return builder.header(header, value);
-                    }
+            AuthType::ApiKey
+                if auth.api_key_location.as_deref() != Some("query") => {
+                if let (Some(header), Some(value)) = (&auth.api_key_header, &auth.api_key_value) {
+                    let header = Self::resolve_env(header, env);
+                    let value = Self::resolve_env(value, env);
+                    return builder.header(header, value);
                 }
             }
             AuthType::EcosystemProvider => {
@@ -691,19 +690,17 @@ impl HttpEngine {
         username: &str, password: &str, domain: &str, workstation: &str,
         challenge_msg: &[u8],
     ) -> String {
-        let (server_challenge, target_info) = match Self::parse_ntlm_challenge(challenge_msg) {
-            Some(v) => v,
-            None => ([0u8; 8], vec![]),
-        };
+        let (server_challenge, target_info) = Self::parse_ntlm_challenge(challenge_msg).unwrap_or_default();
 
         let nt_h = Self::nt_hash(password);
         let ntv2_h = Self::ntlmv2_hash(&nt_h, username, domain);
 
-        // NTLMv2 blob
+        // NTLMv2 blob — 8-byte client challenge from low/high 32 bits of now
         let client_challenge: [u8; 8] = {
-            let t = SystemTime::now().duration_since(UNIX_EPOCH).unwrap_or_default().subsec_nanos();
-            let b = t.to_le_bytes();
-            [b[0], b[1], b[2], b[3], b[4], b[5], b[6], b[7]]
+            let dur = SystemTime::now().duration_since(UNIX_EPOCH).unwrap_or_default();
+            let lo = dur.subsec_nanos().to_le_bytes();
+            let hi = (dur.as_secs() as u32).to_le_bytes();
+            [lo[0], lo[1], lo[2], lo[3], hi[0], hi[1], hi[2], hi[3]]
         };
 
         // Windows FILETIME (100ns intervals since 1601-01-01)

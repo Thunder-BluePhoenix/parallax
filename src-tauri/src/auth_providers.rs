@@ -20,7 +20,7 @@ pub enum EcosystemProvider {
 }
 
 impl EcosystemProvider {
-    pub fn from_str(s: &str) -> Self {
+    pub fn from_name(s: &str) -> Self {
         match s.to_lowercase().as_str() {
             "frappe" | "erpnext" => Self::Frappe,
             "django" => Self::Django,
@@ -72,6 +72,10 @@ pub struct AuthSession {
 /// Top-level auth manager — dispatches to the correct provider
 pub struct AuthProviderManager {
     client: Client,
+}
+
+impl Default for AuthProviderManager {
+    fn default() -> Self { Self::new() }
 }
 
 impl AuthProviderManager {

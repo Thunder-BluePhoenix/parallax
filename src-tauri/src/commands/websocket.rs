@@ -68,7 +68,7 @@ pub async fn ws_connect(
     // Spawn writer task
     tokio::spawn(async move {
         while let Some(msg) = rx.recv().await {
-            if write.send(Message::Text(msg.into())).await.is_err() { break; }
+            if write.send(Message::Text(msg)).await.is_err() { break; }
         }
     });
 

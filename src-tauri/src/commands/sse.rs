@@ -98,10 +98,10 @@ pub async fn sse_connect(
                                     // Parse SSE lines (data: ...)
                                     let mut data_lines = Vec::new();
                                     for line in message.lines() {
-                                        if line.starts_with("data: ") {
-                                            data_lines.push(&line[6..]);
-                                        } else if line.starts_with("data:") {
-                                            data_lines.push(&line[5..]);
+                                        if let Some(d) = line.strip_prefix("data: ") {
+                                            data_lines.push(d);
+                                        } else if let Some(d) = line.strip_prefix("data:") {
+                                            data_lines.push(d);
                                         }
                                     }
 

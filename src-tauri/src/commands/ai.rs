@@ -58,6 +58,7 @@ pub async fn ai_generate_tests(
 }
 
 /// Analyze a 4xx/5xx response and suggest request fixes.
+#[allow(clippy::too_many_arguments)]
 #[command]
 pub async fn ai_repair_request(
     config: serde_json::Value,

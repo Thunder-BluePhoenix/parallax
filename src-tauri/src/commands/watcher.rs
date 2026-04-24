@@ -2,7 +2,7 @@ use tauri::{command, AppHandle, Emitter};
 use tonic::transport::Channel;
 use crate::commands::worker::pb;
 use pb::watcher_service_client::WatcherServiceClient;
-use pb::{GenericRequest, WatchRequest};
+use pb::WatchRequest;
 use serde::Serialize;
 
 #[derive(Serialize, Clone)]

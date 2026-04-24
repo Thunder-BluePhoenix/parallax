@@ -288,6 +288,7 @@ fn explore_laravel(root: &str) -> Result<ExplorerResult> {
     let mut entities = Vec::new();
 
     if models_path.exists() {
+        let fillable_re = regex::Regex::new(r"\\\$fillable\s*=\s*\[([^\]]+)\]").unwrap();
         for entry in std::fs::read_dir(&models_path).unwrap().flatten() {
             if entry.path().extension().and_then(|e| e.to_str()) == Some("php") {
                 let content = std::fs::read_to_string(entry.path()).unwrap_or_default();
@@ -295,8 +296,6 @@ fn explore_laravel(root: &str) -> Result<ExplorerResult> {
                     .and_then(|s| s.to_str())
                     .unwrap_or("Unknown")
                     .to_string();
-
-                let fillable_re = regex::Regex::new(r"\\\$fillable\s*=\s*\[([^\]]+)\]").unwrap();
                 let fields: Vec<SchemaField> = fillable_re.captures(&content)
                     .and_then(|c| c.get(1))
                     .map(|m| {

@@ -26,7 +26,7 @@ pub struct PerformAuthInput {
 #[tauri::command]
 pub async fn perform_auth(input: PerformAuthInput) -> Result<AuthSession, String> {
     let manager = AuthProviderManager::new();
-    let provider = EcosystemProvider::from_str(&input.provider);
+    let provider = EcosystemProvider::from_name(&input.provider);
     manager
         .perform_auth(provider, input.credentials)
         .await

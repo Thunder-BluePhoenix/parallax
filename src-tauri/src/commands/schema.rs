@@ -60,7 +60,6 @@ pub fn explore_schema(root_path: String) -> Result<ExplorerResult, String> {
 pub fn save_design_spec(name: String, yaml: String, _app_handle: tauri::AppHandle) -> Result<(), String> {
     use std::fs;
     use std::path::PathBuf;
-    use tauri::Manager;
     
     // In a real app we'd get the current workspace path, but for now we'll use a local .parallax folder
     // Or we can just use the app's current directory + .parallax/design

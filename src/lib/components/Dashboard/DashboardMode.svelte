@@ -13,6 +13,7 @@
   import ChatPanel from "./ChatPanel.svelte";
   import DocsPanel from "./DocsPanel.svelte";
   import FlowPanel from "./FlowPanel.svelte";
+  import PluginsPanel from "./PluginsPanel.svelte";
   import { unreadCount } from "../../stores/github.svelte";
 
 
@@ -26,7 +27,7 @@
     return fn ? (fn as any)(cmd, args) : Promise.reject("Tauri invoke not found");
   };
 
-  let activeSection = $state<"health" | "loadtest" | "proxy" | "mock" | "history" | "ecosystem" | "ai_settings" | "git" | "team" | "chat" | "docs" | "flow">("health");
+  let activeSection = $state<"health" | "loadtest" | "proxy" | "mock" | "history" | "ecosystem" | "ai_settings" | "git" | "team" | "chat" | "docs" | "flow" | "plugins">("health");
   let workerConnected = $state(false);
 
   const sections = [
@@ -41,7 +42,8 @@
     { id: "team", label: "Team", icon: "👥" },
     { id: "chat", label: "Chat", icon: "💬", badge: true },
     { id: "docs", label: "API Docs", icon: "📄" },
-    { id: "flow", label: "Flow Builder", icon: "🕸" },
+    { id: "flow",    label: "Flow Builder", icon: "🕸" },
+    { id: "plugins", label: "Plugins",      icon: "🧩" },
   ] as const;
 
   // Run history stats
@@ -173,6 +175,9 @@
 
     {:else if activeSection === "flow"}
       <FlowPanel />
+
+    {:else if activeSection === "plugins"}
+      <PluginsPanel />
 
     {:else if activeSection === "history"}
       <div class="dashboard-section animate-fade-in">

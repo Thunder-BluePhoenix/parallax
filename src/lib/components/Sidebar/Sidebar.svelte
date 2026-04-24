@@ -27,6 +27,7 @@
     type Collection, defaultAuth,
   } from "../../stores/app.svelte";
   import EnvironmentPanel from "./EnvironmentPanel.svelte";
+  import ThemePicker from "../Common/ThemePicker.svelte";
   import { importPostmanCollection, importInsomniaExport } from "../../utils/postman-importer";
   import { exportPostmanCollection } from "../../utils/postman-exporter";
   import { importOpenAPI } from "../../utils/openapi-importer";
@@ -34,7 +35,8 @@
 
   let searchQuery   = $state("");
   const uuid = () => Math.random().toString(36).substring(2) + Date.now().toString(36);
-  let showEnvPanel  = $state(false);
+  let showEnvPanel   = $state(false);
+  let showThemePicker = $state(false);
   let importError   = $state("");
   let expandedCols  = $state<Record<string, boolean>>({});
   let expandedFolders = $state<Record<string, boolean>>({});
@@ -571,7 +573,7 @@
     <button
       class="env-btn"
       class:active={showEnvPanel}
-      onclick={() => (showEnvPanel = !showEnvPanel)}
+      onclick={() => { showEnvPanel = !showEnvPanel; showThemePicker = false; }}
       title="Environment variables"
     >
       <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -583,11 +585,27 @@
         <span class="env-count">{Object.keys(activeEnvironment.variables).length}</span>
       {/if}
     </button>
+    <button
+      class="theme-btn icon-btn"
+      class:active={showThemePicker}
+      onclick={() => { showThemePicker = !showThemePicker; showEnvPanel = false; }}
+      title="Theme"
+    >
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <circle cx="12" cy="12" r="10"/>
+        <path d="M12 2a10 10 0 0 1 0 20c-2.76 0-4-1.34-4-3 0-1.7 1.28-3 3-3h1.5c1.38 0 2.5-1.12 2.5-2.5 0-3.58-2.69-6.5-6-6.5"/>
+      </svg>
+    </button>
   </div>
 
   <!-- Environment panel overlay -->
   {#if showEnvPanel}
     <EnvironmentPanel onclose={() => (showEnvPanel = false)} />
+  {/if}
+
+  <!-- Theme picker overlay -->
+  {#if showThemePicker}
+    <ThemePicker onclose={() => (showThemePicker = false)} />
   {/if}
 </aside>
 

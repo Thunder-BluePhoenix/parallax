@@ -4,6 +4,8 @@
   import { generateTests, repairRequest, aiStatus } from "../../stores/ai.svelte";
   import { currentRequestId } from "../../stores/app.svelte";
   import { inferJsonSchema, inferTypeScript, inferPydantic, inferRustStruct, inferGoStruct } from "../../utils/schema-inference";
+  import { generateCode, CODE_LANGS, type CodeLang } from "../../utils/code-gen";
+  import { activeRequest } from "../../stores/app.svelte";
 
   let showRepairPanel = $state(false);
   let repairError     = $state("");
@@ -12,8 +14,16 @@
     !!responseState.response && responseState.response.status >= 400
   );
 
-  let viewMode   = $state<"pretty" | "raw" | "headers" | "cookies" | "tests" | "history" | "visualize" | "schema">("pretty");
+  let viewMode   = $state<"pretty" | "raw" | "headers" | "cookies" | "tests" | "history" | "visualize" | "schema" | "code">("pretty");
   let historyIdx = $state(0);
+
+  // Code generation state
+  let codeLang = $state<CodeLang>("curl");
+  let generatedCode = $derived.by(() => {
+    if (viewMode !== "code") return "";
+    return generateCode(codeLang, activeRequest as any);
+  });
+  function copyCode() { navigator.clipboard.writeText(generatedCode).catch(() => {}); }
 
   // Schema Inference state
   let schemaType = $state<"json" | "ts" | "pydantic" | "rust" | "go">("json");
@@ -157,6 +167,13 @@
           onclick={() => (viewMode = "schema")}
         >
           Schema
+        </button>
+        <button
+          class="view-mode-btn"
+          class:active={viewMode === "code"}
+          onclick={() => (viewMode = "code")}
+        >
+          Code
         </button>
         {#if visualizerData.template}
           <button
@@ -361,6 +378,29 @@
               </div>
             {/each}
           </div>
+        </div>
+
+      {:else if viewMode === "code"}
+        <div class="code-gen-view animate-fade-in">
+          <div class="code-gen-toolbar">
+            <div class="lang-pills">
+              {#each CODE_LANGS as lang}
+                <button
+                  class="lang-pill"
+                  class:active={codeLang === lang.id}
+                  onclick={() => codeLang = lang.id}
+                >{lang.label}</button>
+              {/each}
+            </div>
+            <button class="copy-code-btn" onclick={copyCode} title="Copy to clipboard">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
+                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+              </svg>
+              Copy
+            </button>
+          </div>
+          <pre class="code-gen-pre mono">{generatedCode}</pre>
         </div>
       {/if}
     </div>
@@ -832,6 +872,36 @@
   }
 
   /* ── Schema Viewer ────────────────────────────────────── */
+  /* ── Code Generation ─────────────────────────────────── */
+  .code-gen-view {
+    display: flex; flex-direction: column; height: 100%;
+  }
+  .code-gen-toolbar {
+    display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
+    padding: 8px 12px; border-bottom: 1px solid var(--border-default);
+    background: var(--bg-surface); flex-shrink: 0;
+  }
+  .lang-pills { display: flex; flex-wrap: wrap; gap: 3px; flex: 1; }
+  .lang-pill {
+    padding: 2px 8px; font-size: 10px; font-weight: 600;
+    border-radius: var(--radius-sm); background: transparent;
+    color: var(--text-muted); border: 1px solid transparent;
+  }
+  .lang-pill:hover { color: var(--text-secondary); background: var(--bg-elevated); }
+  .lang-pill.active { background: var(--accent-primary-dim); color: var(--accent-primary); border-color: rgba(124,110,255,0.3); }
+  .copy-code-btn {
+    display: flex; align-items: center; gap: 4px;
+    padding: 4px 10px; font-size: 10px; font-weight: 600;
+    border-radius: var(--radius-sm); border: 1px solid var(--border-default);
+    color: var(--text-secondary); background: var(--bg-elevated); white-space: nowrap; flex-shrink: 0;
+  }
+  .copy-code-btn:hover { border-color: var(--accent-secondary); color: var(--accent-secondary); }
+  .code-gen-pre {
+    flex: 1; overflow: auto; font-size: 11px; line-height: 1.6;
+    color: var(--text-primary); padding: 12px 16px;
+    background: var(--bg-base); white-space: pre; margin: 0;
+  }
+
   .schema-viewer {
     display: flex;
     flex-direction: column;

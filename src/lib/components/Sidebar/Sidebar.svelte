@@ -56,12 +56,131 @@
   });
 
   // ── Context menu state ─────────────────────────────────────
-  let contextMenu = $state<{ x: number; y: number; colName: string } | null>(null);
+  type CtxTarget =
+    | { kind: "collection"; colName: string }
+    | { kind: "folder"; colName: string; folderName: string }
+    | { kind: "request"; colName: string; folderName?: string; reqId: string };
 
-  function closeContextMenu() { 
-    console.log("[Sidebar] Closing context menu");
-    contextMenu = null; 
+  let contextMenu = $state<{ x: number; y: number; target: CtxTarget } | null>(null);
+
+  function closeContextMenu() { contextMenu = null; }
+
+  function showCtx(e: MouseEvent, target: CtxTarget) {
+    e.preventDefault();
+    e.stopPropagation();
+    contextMenu = { x: e.clientX, y: e.clientY, target };
   }
+
+  function ctxDuplicate() {
+    if (!contextMenu || contextMenu.target.kind !== "request") return;
+    const { colName, folderName, reqId } = contextMenu.target;
+    const col = loadedCollections.find(c => c.name === colName);
+    if (!col) { closeContextMenu(); return; }
+    if (folderName) {
+      const folder = col.folders.find(f => f.name === folderName);
+      if (folder) {
+        const idx = folder.requests.findIndex(r => r.id === reqId);
+        if (idx >= 0) {
+          const clone = { ...folder.requests[idx], id: uuid(), name: folder.requests[idx].name + " (copy)" };
+          folder.requests.splice(idx + 1, 0, clone);
+        }
+      }
+    } else {
+      const idx = col.requests.findIndex(r => r.id === reqId);
+      if (idx >= 0) {
+        const clone = { ...col.requests[idx], id: uuid(), name: col.requests[idx].name + " (copy)" };
+        col.requests.splice(idx + 1, 0, clone);
+      }
+    }
+    closeContextMenu();
+  }
+
+  function ctxRename() {
+    if (!contextMenu) return;
+    const t = contextMenu.target;
+    const col = loadedCollections.find(c => c.name === t.colName);
+    if (!col) { closeContextMenu(); return; }
+    if (t.kind === "request") {
+      const list = t.folderName
+        ? col.folders.find(f => f.name === t.folderName)?.requests ?? []
+        : col.requests;
+      const req = list.find(r => r.id === t.reqId);
+      if (req) {
+        const name = window.prompt("Rename request:", req.name);
+        if (name?.trim()) req.name = name.trim();
+      }
+    } else if (t.kind === "folder") {
+      const folder = col.folders.find(f => f.name === t.folderName);
+      if (folder) {
+        const name = window.prompt("Rename folder:", folder.name);
+        if (name?.trim()) folder.name = name.trim();
+      }
+    } else {
+      const name = window.prompt("Rename collection:", col.name);
+      if (name?.trim()) col.name = name.trim();
+    }
+    closeContextMenu();
+  }
+
+  function ctxDelete() {
+    if (!contextMenu) return;
+    const t = contextMenu.target;
+    const col = loadedCollections.find(c => c.name === t.colName);
+    if (!col) { closeContextMenu(); return; }
+    if (t.kind === "request") {
+      if (t.folderName) {
+        const folder = col.folders.find(f => f.name === t.folderName);
+        if (folder) folder.requests = folder.requests.filter(r => r.id !== t.reqId);
+      } else {
+        col.requests = col.requests.filter(r => r.id !== t.reqId);
+      }
+    } else if (t.kind === "folder") {
+      if (window.confirm(`Delete folder "${t.folderName}" and all its requests?`)) {
+        col.folders = col.folders.filter(f => f.name !== t.folderName);
+      }
+    }
+    closeContextMenu();
+  }
+
+  // ── Drag-and-drop reordering ───────────────────────────────
+  let dragSrc = $state<{ colName: string; folderName?: string; reqId: string } | null>(null);
+  let dragOverId = $state<string | null>(null);
+
+  function onDragStart(e: DragEvent, colName: string, reqId: string, folderName?: string) {
+    dragSrc = { colName, folderName, reqId };
+    e.dataTransfer!.effectAllowed = "move";
+  }
+
+  function onDragOver(e: DragEvent, reqId: string) {
+    if (!dragSrc || dragSrc.reqId === reqId) return;
+    e.preventDefault();
+    e.dataTransfer!.dropEffect = "move";
+    dragOverId = reqId;
+  }
+
+  function onDragLeave() { dragOverId = null; }
+
+  function onDrop(e: DragEvent, colName: string, targetReqId: string, folderName?: string) {
+    e.preventDefault();
+    dragOverId = null;
+    if (!dragSrc) return;
+    // Only reorder within the same list
+    if (dragSrc.colName !== colName || dragSrc.folderName !== folderName) { dragSrc = null; return; }
+    const col = loadedCollections.find(c => c.name === colName);
+    if (!col) { dragSrc = null; return; }
+    const list = folderName
+      ? col.folders.find(f => f.name === folderName)?.requests
+      : col.requests;
+    if (!list) { dragSrc = null; return; }
+    const srcIdx = list.findIndex(r => r.id === dragSrc!.reqId);
+    const tgtIdx = list.findIndex(r => r.id === targetReqId);
+    if (srcIdx < 0 || tgtIdx < 0 || srcIdx === tgtIdx) { dragSrc = null; return; }
+    const [item] = list.splice(srcIdx, 1);
+    list.splice(tgtIdx, 0, item);
+    dragSrc = null;
+  }
+
+  function onDragEnd() { dragSrc = null; dragOverId = null; }
 
   // ── Open workspace folder ──────────────────────────────────
   async function openWorkspace() {
@@ -273,15 +392,11 @@
         <button
           class="col-header"
           onclick={() => toggleCol(col.name)}
-          oncontextmenu={(e) => { e.preventDefault(); contextMenu = { x: e.clientX, y: e.clientY, colName: col.name }; }}
+          oncontextmenu={(e) => showCtx(e, { kind: "collection", colName: col.name })}
           title={col.description ?? col.name}
         >
-          <svg
-            class="chevron"
-            class:open={expandedCols[col.name]}
-            width="10" height="10" viewBox="0 0 24 24"
-            fill="none" stroke="currentColor" stroke-width="2.5"
-          >
+          <svg class="chevron" class:open={expandedCols[col.name]}
+            width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
             <polyline points="9 18 15 12 9 6"/>
           </svg>
           <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="col-icon">
@@ -293,12 +408,20 @@
         </button>
 
         {#if expandedCols[col.name]}
-          <!-- Top-level requests -->
+          <!-- Top-level requests (draggable) -->
           {#each col.requests as req}
             <button
               class="req-item"
               class:active={tabs.activeId === req.id}
+              class:drag-over={dragOverId === req.id}
+              draggable="true"
+              ondragstart={(e) => onDragStart(e, col.name, req.id)}
+              ondragover={(e) => onDragOver(e, req.id)}
+              ondragleave={onDragLeave}
+              ondrop={(e) => onDrop(e, col.name, req.id)}
+              ondragend={onDragEnd}
               onclick={() => { loadRequestIntoTab(req); appMode.value = "builder"; }}
+              oncontextmenu={(e) => showCtx(e, { kind: "request", colName: col.name, reqId: req.id })}
             >
               <span class="method-badge {methodColor(req.method)}">{req.method}</span>
               <span class="req-name">{req.name}</span>
@@ -308,7 +431,10 @@
           <!-- Folders -->
           {#each col.folders as folder}
             {@const fkey = col.name + "/" + folder.name}
-            <button class="folder-header" onclick={() => toggleFolder(fkey)}>
+            <button class="folder-header"
+              onclick={() => toggleFolder(fkey)}
+              oncontextmenu={(e) => showCtx(e, { kind: "folder", colName: col.name, folderName: folder.name })}
+            >
               <svg class="chevron sm" class:open={expandedFolders[fkey]}
                 width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
                 <polyline points="9 18 15 12 9 6"/>
@@ -324,7 +450,15 @@
                 <button
                   class="req-item nested"
                   class:active={tabs.activeId === req.id}
+                  class:drag-over={dragOverId === req.id}
+                  draggable="true"
+                  ondragstart={(e) => onDragStart(e, col.name, req.id, folder.name)}
+                  ondragover={(e) => onDragOver(e, req.id)}
+                  ondragleave={onDragLeave}
+                  ondrop={(e) => onDrop(e, col.name, req.id, folder.name)}
+                  ondragend={onDragEnd}
                   onclick={() => { loadRequestIntoTab(req); appMode.value = "builder"; }}
+                  oncontextmenu={(e) => showCtx(e, { kind: "request", colName: col.name, folderName: folder.name, reqId: req.id })}
                 >
                   <span class="method-badge {methodColor(req.method)}">{req.method}</span>
                   <span class="req-name">{req.name}</span>
@@ -354,19 +488,32 @@
   {#if contextMenu}
     <button class="ctx-backdrop" aria-label="Close menu" onclick={closeContextMenu} oncontextmenu={(e) => { e.preventDefault(); closeContextMenu(); }}></button>
     <div class="ctx-menu" style="left:{contextMenu.x}px;top:{contextMenu.y}px">
-      <button class="ctx-item" onclick={() => exportCollection(contextMenu!.colName)}>
-        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-          <polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/>
-        </svg>
-        Export as Postman JSON
-      </button>
-      <button class="ctx-item danger" onclick={() => deleteCollection(contextMenu!.colName)}>
-        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
-        </svg>
-        Delete Collection
-      </button>
+      {#if contextMenu.target.kind === "request"}
+        <button class="ctx-item" onclick={ctxDuplicate}>Duplicate</button>
+        <button class="ctx-item" onclick={ctxRename}>Rename…</button>
+        <div class="ctx-sep"></div>
+        <button class="ctx-item danger" onclick={ctxDelete}>Delete</button>
+      {:else if contextMenu.target.kind === "folder"}
+        <button class="ctx-item" onclick={ctxRename}>Rename…</button>
+        <div class="ctx-sep"></div>
+        <button class="ctx-item danger" onclick={ctxDelete}>Delete folder</button>
+      {:else}
+        <button class="ctx-item" onclick={ctxRename}>Rename…</button>
+        <button class="ctx-item" onclick={() => exportCollection(contextMenu!.target.colName)}>
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+            <polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/>
+          </svg>
+          Export as Postman JSON
+        </button>
+        <div class="ctx-sep"></div>
+        <button class="ctx-item danger" onclick={() => deleteCollection(contextMenu!.target.colName)}>
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+          </svg>
+          Delete Collection
+        </button>
+      {/if}
     </div>
   {/if}
 
@@ -683,5 +830,15 @@
     transition: var(--transition-fast);
   }
   .ctx-item:hover { background: var(--bg-overlay); color: var(--text-primary); }
+  .ctx-item.danger { color: var(--color-error); }
   .ctx-item.danger:hover { background: var(--color-error-dim); color: var(--color-error); }
+  .ctx-sep { height: 1px; background: var(--border-default); margin: 3px 0; }
+
+  /* Drag-and-drop */
+  .req-item { cursor: grab; }
+  .req-item:active { cursor: grabbing; }
+  .req-item.drag-over {
+    background: var(--accent-primary-dim);
+    border-top: 2px solid var(--accent-primary);
+  }
 </style>

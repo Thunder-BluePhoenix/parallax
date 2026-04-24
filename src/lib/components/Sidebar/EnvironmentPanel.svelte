@@ -4,6 +4,8 @@
 
   let { onclose }: { onclose: () => void } = $props();
 
+  let activeTab = $state<"edit" | "diff">("edit");
+
   let envName = $state(activeEnvironment.name);
   let pairs = $state(
     Object.entries(activeEnvironment.variables).map(([k, v]) => ({ k, v, secret: false }))
@@ -26,54 +28,149 @@
     }
     onclose();
   }
+
+  // ── Diff view ───────────────────────────────────────────────
+  let savedEnvs = $state<{ name: string; variables: Record<string, string> }[]>([]);
+  let compareEnvName = $state("");
+
+  async function loadEnvsForDiff() {
+    if (!currentWorkspace.path) return;
+    try {
+      const names: string[] = await invoke("list_environments", { workspace: currentWorkspace.path });
+      const envs = await Promise.all(
+        names.map(n => invoke<{ name: string; variables: Record<string, string> }>(
+          "load_environment", { workspace: currentWorkspace.path, name: n }
+        ).catch(() => null))
+      );
+      savedEnvs = envs.filter(Boolean) as typeof savedEnvs;
+      if (savedEnvs.length > 0 && !compareEnvName) compareEnvName = savedEnvs[0].name;
+    } catch { savedEnvs = []; }
+  }
+
+  $effect(() => { if (activeTab === "diff") loadEnvsForDiff(); });
+
+  const compareEnv = $derived(savedEnvs.find(e => e.name === compareEnvName));
+
+  interface DiffRow {
+    key: string;
+    left: string | undefined;   // active env
+    right: string | undefined;  // compare env
+    status: "same" | "changed" | "added" | "removed";
+  }
+
+  const diffRows = $derived.by((): DiffRow[] => {
+    const leftVars = activeEnvironment.variables;
+    const rightVars = compareEnv?.variables ?? {};
+    const allKeys = new Set([...Object.keys(leftVars), ...Object.keys(rightVars)]);
+    return [...allKeys].sort().map(key => {
+      const l = leftVars[key];
+      const r = rightVars[key];
+      const status =
+        l === undefined ? "added" :
+        r === undefined ? "removed" :
+        l !== r         ? "changed" : "same";
+      return { key, left: l, right: r, status };
+    });
+  });
 </script>
 
 <div class="env-panel animate-fade-in">
   <div class="env-header">
     <span class="env-title">Environment</span>
+    <div class="tab-pills">
+      <button class="tab-pill" class:active={activeTab === "edit"} onclick={() => activeTab = "edit"}>Edit</button>
+      <button class="tab-pill" class:active={activeTab === "diff"} onclick={() => activeTab = "diff"}>Diff</button>
+    </div>
     <button class="close-x" onclick={onclose}>×</button>
   </div>
 
-  <div class="env-name-row">
-    <label for="env-name" class="field-label">Name</label>
-    <input id="env-name" type="text" bind:value={envName} placeholder="dev" />
-  </div>
+  {#if activeTab === "edit"}
+    <div class="env-name-row">
+      <label for="env-name" class="field-label">Name</label>
+      <input id="env-name" type="text" bind:value={envName} placeholder="dev" />
+    </div>
 
-  <div class="pairs-header">
-    <span>Key</span>
-    <span>Value</span>
-  </div>
+    <div class="pairs-header">
+      <span>Key</span>
+      <span>Value</span>
+    </div>
 
-  <div class="pairs-scroll scroll-y">
-    {#each pairs as row, i}
-      <div class="pair-row">
-        <input class="mono" type="text" placeholder="variable" bind:value={row.k} />
-        <input class="mono" type={row.secret ? "password" : "text"} placeholder="value" bind:value={row.v} />
-        <button class="secret-toggle" title="Toggle secret" onclick={() => (row.secret = !row.secret)}>
-          {#if row.secret}
-            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/>
-              <path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/>
-              <line x1="1" y1="1" x2="23" y2="23"/>
-            </svg>
-          {:else}
-            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
-              <circle cx="12" cy="12" r="3"/>
-            </svg>
+    <div class="pairs-scroll scroll-y">
+      {#each pairs as row, i}
+        <div class="pair-row">
+          <input class="mono" type="text" placeholder="variable" bind:value={row.k} />
+          <input class="mono" type={row.secret ? "password" : "text"} placeholder="value" bind:value={row.v} />
+          <button class="secret-toggle" title="Toggle secret" onclick={() => (row.secret = !row.secret)}>
+            {#if row.secret}
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/>
+                <path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/>
+                <line x1="1" y1="1" x2="23" y2="23"/>
+              </svg>
+            {:else}
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+                <circle cx="12" cy="12" r="3"/>
+              </svg>
+            {/if}
+          </button>
+          <button class="remove-btn" onclick={() => removeRow(i)}>×</button>
+        </div>
+      {/each}
+    </div>
+
+    <button class="add-pair-btn" onclick={addRow}>+ Add variable</button>
+
+    <div class="env-actions">
+      <button class="btn-cancel" onclick={onclose}>Cancel</button>
+      <button class="btn-apply" onclick={apply}>Apply</button>
+    </div>
+
+  {:else}
+    <!-- Diff view -->
+    <div class="diff-bar">
+      <span class="field-label">Compare with:</span>
+      <select class="diff-select mono" bind:value={compareEnvName}>
+        {#each savedEnvs as env}
+          <option value={env.name}>{env.name}</option>
+        {/each}
+        {#if savedEnvs.length === 0}
+          <option value="">No saved environments</option>
+        {/if}
+      </select>
+    </div>
+
+    <div class="diff-legend">
+      <span class="diff-badge same">= same</span>
+      <span class="diff-badge changed">~ changed</span>
+      <span class="diff-badge removed">− only here</span>
+      <span class="diff-badge added">+ only there</span>
+    </div>
+
+    <div class="diff-scroll scroll-y">
+      {#if diffRows.length === 0}
+        <div class="diff-empty">No variables to compare.</div>
+      {:else}
+        {#each diffRows as row}
+          {#if row.status !== "same"}
+            <div class="diff-row diff-{row.status}">
+              <span class="diff-key mono">{row.key}</span>
+              <span class="diff-val mono">{row.left ?? "—"}</span>
+              <span class="diff-arrow">→</span>
+              <span class="diff-val mono">{row.right ?? "—"}</span>
+            </div>
           {/if}
-        </button>
-        <button class="remove-btn" onclick={() => removeRow(i)}>×</button>
-      </div>
-    {/each}
-  </div>
+        {/each}
+        {#if diffRows.every(r => r.status === "same")}
+          <div class="diff-empty">Environments are identical.</div>
+        {/if}
+      {/if}
+    </div>
 
-  <button class="add-pair-btn" onclick={addRow}>+ Add variable</button>
-
-  <div class="env-actions">
-    <button class="btn-cancel" onclick={onclose}>Cancel</button>
-    <button class="btn-apply" onclick={apply}>Apply</button>
-  </div>
+    <div class="env-actions">
+      <button class="btn-cancel" onclick={onclose}>Close</button>
+    </div>
+  {/if}
 </div>
 
 <style>
@@ -96,11 +193,57 @@
   .env-header {
     display: flex;
     align-items: center;
-    justify-content: space-between;
-    padding: 10px 12px 8px;
+    gap: 8px;
+    padding: 8px 12px;
     border-bottom: 1px solid var(--border-subtle);
     flex-shrink: 0;
   }
+
+  .tab-pills { display: flex; gap: 2px; flex: 1; }
+  .tab-pill {
+    padding: 2px 10px; font-size: 10px; font-weight: 700;
+    border-radius: 10px; background: transparent; color: var(--text-muted);
+    transition: var(--transition-fast);
+  }
+  .tab-pill:hover { color: var(--text-primary); }
+  .tab-pill.active { background: var(--accent-primary-dim); color: var(--accent-primary); }
+
+  /* Diff view */
+  .diff-bar {
+    display: flex; align-items: center; gap: 8px;
+    padding: 8px 12px; border-bottom: 1px solid var(--border-subtle); flex-shrink: 0;
+  }
+  .diff-select {
+    flex: 1; height: 24px; padding: 0 6px; font-size: 11px;
+    background: var(--bg-elevated); border: 1px solid var(--border-default);
+    border-radius: var(--radius-sm); color: var(--text-primary);
+  }
+  .diff-legend {
+    display: flex; gap: 6px; padding: 5px 12px; flex-shrink: 0; flex-wrap: wrap;
+  }
+  .diff-badge {
+    font-size: 9px; font-weight: 700; padding: 1px 6px;
+    border-radius: 8px; font-family: var(--font-mono);
+  }
+  .diff-badge.same    { background: rgba(139,148,158,0.15); color: var(--text-muted); }
+  .diff-badge.changed { background: rgba(227,179,65,0.15);  color: var(--color-warning); }
+  .diff-badge.removed { background: rgba(248,81,73,0.15);   color: var(--color-error); }
+  .diff-badge.added   { background: rgba(63,185,80,0.15);   color: var(--color-success); }
+
+  .diff-scroll { flex: 1; padding: 4px 8px; overflow-y: auto; min-height: 60px; }
+  .diff-row {
+    display: grid; grid-template-columns: 1fr 1fr 16px 1fr;
+    gap: 4px; align-items: center;
+    padding: 4px 6px; border-radius: var(--radius-sm);
+    margin-bottom: 2px; font-size: 10px;
+  }
+  .diff-row.diff-changed { background: rgba(227,179,65,0.08); border-left: 2px solid var(--color-warning); }
+  .diff-row.diff-removed { background: rgba(248,81,73,0.08);  border-left: 2px solid var(--color-error); }
+  .diff-row.diff-added   { background: rgba(63,185,80,0.08);  border-left: 2px solid var(--color-success); }
+  .diff-key   { color: var(--text-secondary); font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .diff-val   { color: var(--text-primary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .diff-arrow { color: var(--text-muted); text-align: center; }
+  .diff-empty { padding: 16px; text-align: center; font-size: 11px; color: var(--text-muted); }
 
   .env-title {
     font-size: 11px;

@@ -35,6 +35,7 @@ pub fn run() {
             commands::http::cancel_request,
             // gRPC
             commands::grpc::grpc_unary,
+            commands::grpc::grpc_server_stream,
             // File utilities
             commands::workspace::read_file_for_template,
             // Persistence

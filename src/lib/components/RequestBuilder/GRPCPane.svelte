@@ -1,5 +1,7 @@
 <script lang="ts">
   import { invoke } from "@tauri-apps/api/core";
+  import { listen, type UnlistenFn } from "@tauri-apps/api/event";
+  import { onDestroy } from "svelte";
 
   interface GrpcResponse {
     grpc_status: number;
@@ -15,34 +17,38 @@
   let methodPath = $state("");
   let requestJson = $state("{}");
   let tlsSkipVerify = $state(false);
-  let metadataRaw = $state("");  // "key: value\nkey2: value2"
+  let callType = $state<"unary" | "stream">("unary");
+  let metadataRaw = $state("");
 
   let response = $state<GrpcResponse | null>(null);
   let loading = $state(false);
   let error = $state<string | null>(null);
   let activeTab = $state<"response" | "headers" | "trailers">("response");
 
+  // Streaming state
+  let streamMessages = $state<string[]>([]);
+  let streamDone = $state(false);
+  let streamId = $state("");
+  let unlistenMsg: UnlistenFn | null = null;
+  let unlistenEnd: UnlistenFn | null = null;
+
   function parseMetadata(): Record<string, string> {
     const out: Record<string, string> = {};
     for (const line of metadataRaw.split("\n")) {
       const ci = line.indexOf(":");
-      if (ci > 0) {
-        out[line.slice(0, ci).trim()] = line.slice(ci + 1).trim();
-      }
+      if (ci > 0) out[line.slice(0, ci).trim()] = line.slice(ci + 1).trim();
     }
     return out;
   }
 
   async function send() {
     if (!serverAddr || !methodPath) return;
+    if (callType === "stream") { await startStream(); return; }
     loading = true; error = null; response = null;
     try {
       response = await invoke<GrpcResponse>("grpc_unary", {
-        serverAddr,
-        methodPath,
-        requestJson,
-        metadata: parseMetadata(),
-        tlsSkipVerify,
+        serverAddr, methodPath, requestJson,
+        metadata: parseMetadata(), tlsSkipVerify,
       });
     } catch (e: any) {
       error = String(e);
@@ -51,11 +57,41 @@
     }
   }
 
-  const statusLabel = $derived(
-    response === null ? "" :
-    response.grpc_status === 0 ? "OK" :
-    grpcStatusName(response.grpc_status)
-  );
+  async function startStream() {
+    stopStream();
+    streamMessages = []; streamDone = false; error = null;
+    streamId = Math.random().toString(36).slice(2);
+    loading = true;
+
+    unlistenMsg = await listen<string>(`grpc_stream_message_${streamId}`, (evt) => {
+      try {
+        const pretty = JSON.stringify(JSON.parse(evt.payload), null, 2);
+        streamMessages.push(pretty);
+      } catch {
+        streamMessages.push(evt.payload);
+      }
+    });
+
+    unlistenEnd = await listen<any>(`grpc_stream_end_${streamId}`, (evt) => {
+      loading = false; streamDone = true;
+      if (evt.payload?.error) error = evt.payload.error;
+      stopStream();
+    });
+
+    invoke("grpc_server_stream", {
+      serverAddr, methodPath, requestJson,
+      metadata: parseMetadata(), streamId, tlsSkipVerify,
+    }).catch((e: any) => {
+      error = String(e); loading = false; streamDone = true; stopStream();
+    });
+  }
+
+  function stopStream() {
+    unlistenMsg?.(); unlistenMsg = null;
+    unlistenEnd?.(); unlistenEnd = null;
+  }
+
+  onDestroy(stopStream);
 
   function grpcStatusName(code: number): string {
     const names: Record<number, string> = {
@@ -66,6 +102,11 @@
     };
     return names[code] ?? `STATUS_${code}`;
   }
+
+  const statusLabel = $derived(
+    response === null ? "" :
+    response.grpc_status === 0 ? "OK" : grpcStatusName(response.grpc_status)
+  );
 
   let prettyJson = $derived.by(() => {
     if (!response?.message_json) return "";
@@ -100,9 +141,21 @@
   <!-- Options row -->
   <div class="grpc-options">
     <label class="opt-toggle">
+      <input type="radio" bind:group={callType} value="unary" />
+      <span>Unary</span>
+    </label>
+    <label class="opt-toggle">
+      <input type="radio" bind:group={callType} value="stream" />
+      <span>Server stream</span>
+    </label>
+    <span class="opt-sep"></span>
+    <label class="opt-toggle">
       <input type="checkbox" bind:checked={tlsSkipVerify} />
       <span>Skip TLS verify</span>
     </label>
+    {#if callType === "stream" && loading}
+      <button class="btn-stop" onclick={stopStream}>Stop</button>
+    {/if}
   </div>
 
   <div class="grpc-body">
@@ -113,7 +166,7 @@
         class="grpc-textarea mono"
         bind:value={requestJson}
         spellcheck="false"
-        placeholder="{}"
+        placeholder="&#123;&#125;"
       ></textarea>
       <div class="pane-label" style="margin-top:8px">Metadata</div>
       <textarea
@@ -128,6 +181,28 @@
     <div class="grpc-response">
       {#if error}
         <div class="grpc-error">{error}</div>
+      {/if}
+
+      {#if callType === "stream"}
+        <!-- Streaming response feed -->
+        <div class="stream-header">
+          <span class="pane-label">Stream messages</span>
+          <span class="stream-count">{streamMessages.length} received</span>
+          {#if streamDone}<span class="stream-done">✓ done</span>{/if}
+          {#if loading}<span class="stream-live">● live</span>{/if}
+        </div>
+        <div class="stream-feed mono">
+          {#each streamMessages as msg, i}
+            <div class="stream-msg">
+              <span class="stream-idx">{i + 1}</span>
+              <pre class="stream-pre">{msg}</pre>
+            </div>
+          {/each}
+          {#if streamMessages.length === 0 && !loading}
+            <div class="grpc-empty">No messages yet. Click Invoke to start streaming.</div>
+          {/if}
+        </div>
+
       {:else if response}
         <div class="grpc-status-bar">
           <span class="grpc-badge" class:ok={response.grpc_status === 0} class:err={response.grpc_status !== 0}>
@@ -163,7 +238,8 @@
             {/if}
           </div>
         {/if}
-      {:else}
+
+      {:else if !error}
         <div class="grpc-empty">
           Enter a server address and method path, then click <strong>Invoke</strong>.
           <br /><br />
@@ -271,8 +347,39 @@
   .kv-key { color: var(--accent-secondary); min-width: 120px; }
   .kv-val { color: var(--text-primary); word-break: break-all; }
 
-  .grpc-error { color: var(--color-error); font-size: 12px; padding: 12px; background: rgba(248,81,73,0.08); border-radius: var(--radius-md); }
+  .grpc-error { color: var(--color-error); font-size: 12px; padding: 12px; background: rgba(248,81,73,0.08); border-radius: var(--radius-md); margin-bottom: 8px; }
   .grpc-empty { color: var(--text-muted); font-size: 12px; padding: 24px 0; }
   .grpc-hint { font-size: 11px; line-height: 1.6; }
   .grpc-hint code { color: var(--accent-secondary); font-family: var(--font-mono); }
+
+  .opt-sep { flex: 1; }
+  .btn-stop {
+    height: 22px; padding: 0 10px; font-size: 10px; font-weight: 700;
+    background: rgba(248,81,73,0.15); color: var(--color-error);
+    border: 1px solid rgba(248,81,73,0.3); border-radius: var(--radius-sm);
+  }
+  .btn-stop:hover { background: rgba(248,81,73,0.25); }
+
+  /* Streaming */
+  .stream-header {
+    display: flex; align-items: center; gap: 8px;
+    margin-bottom: 6px; flex-shrink: 0;
+  }
+  .stream-count { font-size: 10px; color: var(--text-muted); }
+  .stream-done  { font-size: 10px; color: var(--color-success); font-weight: 700; }
+  .stream-live  { font-size: 10px; color: var(--color-error); font-weight: 700; animation: pulse-dot 1.2s infinite; }
+
+  .stream-feed {
+    flex: 1; overflow-y: auto;
+    background: var(--bg-elevated); border: 1px solid var(--border-default);
+    border-radius: var(--radius-md); padding: 6px;
+    display: flex; flex-direction: column; gap: 4px;
+  }
+  .stream-msg {
+    display: flex; gap: 6px; align-items: flex-start;
+    padding: 4px 6px; background: var(--bg-surface);
+    border-radius: var(--radius-sm); border-left: 2px solid var(--accent-primary);
+  }
+  .stream-idx  { font-size: 9px; color: var(--text-muted); min-width: 18px; padding-top: 2px; text-align: right; }
+  .stream-pre  { margin: 0; font-size: 11px; color: var(--text-primary); white-space: pre-wrap; word-break: break-all; }
 </style>

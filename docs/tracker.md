@@ -42,7 +42,7 @@ Phase 5    ░░░░░░░░░░░░░░░░░░░░   0%  �
 | GraphQL — query + variables body | ✅ Done | Body type wired |
 | GraphQL schema introspection | ✅ Done | Fetch Schema button; type browser panel | |
 | gRPC unary calls | ✅ Done | `grpc_unary` Rust command + `GRPCPane.svelte` — HTTP/2 + grpc+json framing |
-| gRPC streaming | 🔲 | Deferred — requires server-streaming SSE bridge |
+| gRPC streaming | ✅ Done | `grpc_server_stream` Tauri command + Tauri events per frame; stream feed UI in `GRPCPane.svelte` |
 | WebSocket — connect/send/disconnect/stream | ✅ Done | `tokio-tungstenite`; Tauri event bridge |
 | SSE — Server-Sent Events streaming | ✅ Done | `reqwest` bytes_stream; Tauri event bridge |
 | Follow redirects (configurable) | ✅ Done | |
@@ -155,11 +155,11 @@ Phase 5    ░░░░░░░░░░░░░░░░░░░░   0%  �
 | Sidebar method badges | ✅ Done | |
 | Sidebar import button (Postman / Insomnia) | ✅ Done | |
 | Sidebar git branch chip | ✅ Done | |
-| Sidebar drag-and-drop reordering | 🔲 | Deferred — complex DnD implementation |
+| Sidebar drag-and-drop reordering | ✅ Done | HTML5 drag-and-drop on req-items in `Sidebar.svelte`; reorders within collection/folder |
 | Sidebar right-click context menu | ✅ Done | Duplicate / Rename / Delete on requests, folders, collections |
 | Environment quick-edit overlay with secret masking | ✅ Done | |
 | Environment variable count badge | ✅ Done | |
-| Environment diff view | 🔲 | Deferred to Phase 5 polish |
+| Environment diff view | ✅ Done | Diff tab in `EnvironmentPanel.svelte` — changed/added/removed comparison against any saved env |
 | Multi-tab UI | ✅ Done | |
 | Tabs persist across restarts | ✅ Done | localStorage via persistTabs() | |
 | Collection Runner UI | ✅ Done | `CollectionRunner.svelte` — iterations, delay, stop-on-failure, live feed |

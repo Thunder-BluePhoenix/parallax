@@ -3,7 +3,7 @@
   import VisualizerIframe from "./VisualizerIframe.svelte";
   import { generateTests, repairRequest, aiStatus } from "../../stores/ai.svelte";
   import { currentRequestId } from "../../stores/app.svelte";
-  import { inferJsonSchema, inferTypeScript } from "../../utils/schema-inference";
+  import { inferJsonSchema, inferTypeScript, inferPydantic, inferRustStruct, inferGoStruct } from "../../utils/schema-inference";
 
   let showRepairPanel = $state(false);
   let repairError     = $state("");
@@ -16,14 +16,16 @@
   let historyIdx = $state(0);
 
   // Schema Inference state
-  let schemaType = $state<"json" | "ts">("json");
+  let schemaType = $state<"json" | "ts" | "pydantic" | "rust" | "go">("json");
   let inferredSchema = $derived.by(() => {
     const json = responseState.response?.body?.json;
     if (!json) return "";
-    if (schemaType === "json") {
-      return JSON.stringify(inferJsonSchema(json), null, 2);
-    } else {
-      return inferTypeScript(json, "Response");
+    switch (schemaType) {
+      case "json":    return JSON.stringify(inferJsonSchema(json), null, 2);
+      case "ts":      return inferTypeScript(json, "Response");
+      case "pydantic":return inferPydantic(json, "Response");
+      case "rust":    return inferRustStruct(json, "Response");
+      case "go":      return inferGoStruct(json, "Response");
     }
   });
 
@@ -338,6 +340,9 @@
             <div class="schema-toggle">
               <button class="toggle-btn" class:active={schemaType === "json"} onclick={() => schemaType = "json"}>JSON Schema</button>
               <button class="toggle-btn" class:active={schemaType === "ts"} onclick={() => schemaType = "ts"}>TypeScript</button>
+              <button class="toggle-btn" class:active={schemaType === "pydantic"} onclick={() => schemaType = "pydantic"}>Pydantic</button>
+              <button class="toggle-btn" class:active={schemaType === "rust"} onclick={() => schemaType = "rust"}>Rust</button>
+              <button class="toggle-btn" class:active={schemaType === "go"} onclick={() => schemaType = "go"}>Go</button>
             </div>
             <div style="flex:1"></div>
             <button class="ai-btn" onclick={() => {

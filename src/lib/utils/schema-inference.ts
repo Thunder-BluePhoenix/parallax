@@ -1,5 +1,123 @@
 import toJsonSchema from 'to-json-schema';
 
+// ── Pydantic (Python) ─────────────────────────────────────────────────────────
+
+export function inferPydantic(data: any, className: string = 'Response'): string {
+  const schema = inferJsonSchema(data);
+  const classes: string[] = [];
+
+  function pyType(details: any, name: string = ''): string {
+    switch (details.type) {
+      case 'string': return 'str';
+      case 'number': return 'float';
+      case 'integer': return 'int';
+      case 'boolean': return 'bool';
+      case 'null': return 'None';
+      case 'array': {
+        const inner = details.items ? pyType(details.items, name + 'Item') : 'Any';
+        return `list[${inner}]`;
+      }
+      case 'object': return generateClass(details, toPascal(name) || 'SubModel');
+      default: return 'Any';
+    }
+  }
+
+  function generateClass(obj: any, name: string): string {
+    if (obj.type !== 'object' || !obj.properties) return 'Any';
+    const safeName = toPascal(name);
+    const fields = Object.entries(obj.properties as Record<string, any>)
+      .map(([k, v]) => `    ${k}: ${pyType(v, k)}`)
+      .join('\n');
+    classes.push(`class ${safeName}(BaseModel):\n${fields || '    pass'}`);
+    return safeName;
+  }
+
+  generateClass(schema, className);
+  return `from pydantic import BaseModel\nfrom typing import Any\n\n${classes.reverse().join('\n\n')}\n`;
+}
+
+// ── Rust struct ───────────────────────────────────────────────────────────────
+
+export function inferRustStruct(data: any, structName: string = 'Response'): string {
+  const schema = inferJsonSchema(data);
+  const structs: string[] = [];
+
+  function rustType(details: any, name: string = ''): string {
+    switch (details.type) {
+      case 'string': return 'String';
+      case 'number': return 'f64';
+      case 'integer': return 'i64';
+      case 'boolean': return 'bool';
+      case 'null': return '()';
+      case 'array': {
+        const inner = details.items ? rustType(details.items, name + 'Item') : 'serde_json::Value';
+        return `Vec<${inner}>`;
+      }
+      case 'object': return generateStruct(details, toPascal(name) || 'SubStruct');
+      default: return 'serde_json::Value';
+    }
+  }
+
+  function generateStruct(obj: any, name: string): string {
+    if (obj.type !== 'object' || !obj.properties) return 'serde_json::Value';
+    const safeName = toPascal(name);
+    const fields = Object.entries(obj.properties as Record<string, any>)
+      .map(([k, v]) => `    pub ${toSnake(k)}: ${rustType(v, k)},`)
+      .join('\n');
+    structs.push(`#[derive(Debug, Clone, Serialize, Deserialize)]\npub struct ${safeName} {\n${fields}\n}`);
+    return safeName;
+  }
+
+  generateStruct(schema, structName);
+  return `use serde::{Deserialize, Serialize};\n\n${structs.reverse().join('\n\n')}\n`;
+}
+
+// ── Go struct ─────────────────────────────────────────────────────────────────
+
+export function inferGoStruct(data: any, structName: string = 'Response'): string {
+  const schema = inferJsonSchema(data);
+  const structs: string[] = [];
+
+  function goType(details: any, name: string = ''): string {
+    switch (details.type) {
+      case 'string': return 'string';
+      case 'number': return 'float64';
+      case 'integer': return 'int64';
+      case 'boolean': return 'bool';
+      case 'null': return 'interface{}';
+      case 'array': {
+        const inner = details.items ? goType(details.items, name + 'Item') : 'interface{}';
+        return `[]${inner}`;
+      }
+      case 'object': return generateStruct(details, toPascal(name) || 'SubStruct');
+      default: return 'interface{}';
+    }
+  }
+
+  function generateStruct(obj: any, name: string): string {
+    if (obj.type !== 'object' || !obj.properties) return 'interface{}';
+    const safeName = toPascal(name);
+    const fields = Object.entries(obj.properties as Record<string, any>)
+      .map(([k, v]) => `\t${toPascal(k)} ${goType(v, k)} \`json:"${k}"\``)
+      .join('\n');
+    structs.push(`type ${safeName} struct {\n${fields}\n}`);
+    return safeName;
+  }
+
+  generateStruct(schema, structName);
+  return `package main\n\n${structs.reverse().join('\n\n')}\n`;
+}
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
+function toPascal(s: string): string {
+  return s.replace(/(^|[-_\s])(\w)/g, (_, __, c) => c.toUpperCase());
+}
+
+function toSnake(s: string): string {
+  return s.replace(/([A-Z])/g, '_$1').replace(/^_/, '').replace(/-/g, '_').toLowerCase();
+}
+
 export function inferJsonSchema(data: any): any {
   if (data === null || data === undefined) return { type: 'null' };
   

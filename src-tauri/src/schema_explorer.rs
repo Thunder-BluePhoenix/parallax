@@ -86,6 +86,16 @@ impl SchemaExplorer {
             return explore_rails(root);
         }
 
+        // FastAPI: look for main.py with FastAPI() + Pydantic models
+        if has_fastapi_structure(&path) {
+            return explore_fastapi(root);
+        }
+
+        // Express: look for package.json with express + route files
+        if has_express_structure(&path) {
+            return explore_express(root);
+        }
+
         // Fallback: generic
         Ok(ExplorerResult {
             framework: "unknown".to_string(),
@@ -491,6 +501,126 @@ fn parse_openapi(root: &str, spec_path: &Path) -> Result<ExplorerResult> {
         entities,
         endpoints,
         raw_spec: Some(spec),
+    })
+}
+
+// =============================================================================
+// FASTAPI Explorer
+// Crawls: **/*.py for class Model(BaseModel) Pydantic definitions
+// and @app.get/post/put/delete/patch decorators for routes
+// =============================================================================
+fn has_fastapi_structure(path: &Path) -> bool {
+    walkdir::WalkDir::new(path).into_iter().any(|e| {
+        e.ok().map(|e| {
+            if e.path().extension().and_then(|x| x.to_str()) != Some("py") { return false; }
+            let content = std::fs::read_to_string(e.path()).unwrap_or_default();
+            content.contains("FastAPI()") || content.contains("from fastapi")
+        }).unwrap_or(false)
+    })
+}
+
+fn explore_fastapi(root: &str) -> Result<ExplorerResult> {
+    let path = PathBuf::from(root);
+    let mut entities = Vec::new();
+    let mut endpoints = Vec::new();
+
+    let class_re = regex::Regex::new(r"class\s+(\w+)\s*\([^)]*BaseModel[^)]*\)").unwrap();
+    let field_re = regex::Regex::new(r"\s{4}(\w+)\s*:\s*([\w\[\], |]+)").unwrap();
+    let route_re = regex::Regex::new(r#"@(?:app|router)\.(get|post|put|patch|delete)\s*\(\s*["']([^"']+)["']"#).unwrap();
+
+    for entry in walkdir::WalkDir::new(&path).into_iter().filter_map(|e| e.ok()) {
+        let p = entry.path();
+        if p.extension().and_then(|x| x.to_str()) != Some("py") { continue; }
+        let content = std::fs::read_to_string(p).unwrap_or_default();
+
+        for class_match in class_re.captures_iter(&content) {
+            let class_name = class_match.get(1).map(|m| m.as_str().to_string()).unwrap_or_default();
+            let start = class_match.get(0).unwrap().end();
+            let rest = &content[start..];
+            let end = class_re.find(rest).map(|m| m.start()).unwrap_or(rest.len().min(800));
+            let body = &rest[..end];
+
+            let fields: Vec<SchemaField> = field_re.captures_iter(body)
+                .map(|c| SchemaField {
+                    name: c.get(1).map(|m| m.as_str().to_string()).unwrap_or_default(),
+                    field_type: c.get(2).map(|m| m.as_str().trim().to_string()).unwrap_or_default(),
+                    required: true,
+                    options: None, description: None, default: None,
+                })
+                .collect();
+
+            entities.push(SchemaEntity {
+                name: class_name,
+                kind: EntityKind::FastApiModel,
+                fields,
+                endpoints: vec![],
+                description: None,
+                source_file: p.to_string_lossy().to_string(),
+            });
+        }
+
+        for cap in route_re.captures_iter(&content) {
+            endpoints.push(InferredEndpoint {
+                method: cap.get(1).map(|m| m.as_str().to_uppercase()).unwrap_or_default(),
+                path: cap.get(2).map(|m| m.as_str().to_string()).unwrap_or_default(),
+                description: None,
+            });
+        }
+    }
+
+    Ok(ExplorerResult {
+        framework: "fastapi".to_string(),
+        root_path: root.to_string(),
+        entities,
+        endpoints,
+        raw_spec: None,
+    })
+}
+
+// =============================================================================
+// EXPRESS Explorer
+// Crawls: **/*.js|*.ts for router.get/post/put/delete/patch route registrations
+// =============================================================================
+fn has_express_structure(path: &Path) -> bool {
+    let pkg = path.join("package.json");
+    if pkg.exists() {
+        let content = std::fs::read_to_string(pkg).unwrap_or_default();
+        if content.contains("\"express\"") { return true; }
+    }
+    false
+}
+
+fn explore_express(root: &str) -> Result<ExplorerResult> {
+    let path = PathBuf::from(root);
+    let mut endpoints = Vec::new();
+
+    let route_re = regex::Regex::new(
+        r#"(?:router|app)\.(get|post|put|patch|delete)\s*\(\s*["'`]([^"'`]+)["'`]"#
+    ).unwrap();
+
+    for entry in walkdir::WalkDir::new(&path).into_iter().filter_map(|e| e.ok()) {
+        let p = entry.path();
+        let ext = p.extension().and_then(|x| x.to_str()).unwrap_or("");
+        if ext != "js" && ext != "ts" && ext != "mjs" { continue; }
+        // Skip node_modules
+        if p.to_string_lossy().contains("node_modules") { continue; }
+        let content = std::fs::read_to_string(p).unwrap_or_default();
+
+        for cap in route_re.captures_iter(&content) {
+            endpoints.push(InferredEndpoint {
+                method: cap.get(1).map(|m| m.as_str().to_uppercase()).unwrap_or_default(),
+                path: cap.get(2).map(|m| m.as_str().to_string()).unwrap_or_default(),
+                description: None,
+            });
+        }
+    }
+
+    Ok(ExplorerResult {
+        framework: "express".to_string(),
+        root_path: root.to_string(),
+        entities: vec![],
+        endpoints,
+        raw_spec: None,
     })
 }
 

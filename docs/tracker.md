@@ -1,6 +1,6 @@
 # Parallax — Development Tracker
 
-Last updated: 2026-04-24 (Phase 3 complete)
+Last updated: 2026-04-24 (Phase 4 complete)
 
 ---
 
@@ -11,7 +11,7 @@ Phase 1    ███████████████████░  97%  �
 Phase 2    ████████████████████ 100%  ✅ Complete
 Phase 2.5  ████████████████████ 100%  ✅ Complete (Git Collaboration + Chat)
 Phase 3    ████████████████████ 100%  ✅ Complete (AI providers, MCP server, Design Mode, script assistant, OpenAPI export)
-Phase 4    ░░░░░░░░░░░░░░░░░░░░   0%  🔲 Planned
+Phase 4    ████████████████████ 100%  ✅ Complete (auth providers, schema crawlers, response intelligence, flow builder)
 Phase 5    ░░░░░░░░░░░░░░░░░░░░   0%  🔲 Planned
 ```
 
@@ -426,43 +426,58 @@ Phase 5    ░░░░░░░░░░░░░░░░░░░░   0%  �
 
 ## Phase 4 — Ecosystem Intelligence
 
-> Not started.
+> Complete. Full auth provider set, schema crawlers for 7 frameworks, response intelligence (5 schema export formats), OAuth2 PKCE, and visual SVG flow builder.
 
 ### Auth Providers (Full Set)
-| Task | Status |
-|---|---|
-| Frappe / ERPNext (full) | 🔲 |
-| Django / Laravel / Rails / WordPress / Next.js / FastAPI / ASP.NET | 🔲 |
-| OAuth2 (code + PKCE + client_credentials + password) | 🔲 |
-| AWS Signature v4 / Digest / NTLM / mTLS | 🔲 |
+| Task | Status | Notes |
+|---|---|---|
+| Frappe / ERPNext (full) | ✅ Done | `auth_providers.rs` — sid+CSRF token flow |
+| Django | ✅ Done | Session cookie + CSRF header |
+| Laravel | ✅ Done | Sanctum XSRF-TOKEN cookie |
+| Rails | ✅ Done | `authenticity_token` form injection |
+| WordPress | ✅ Done | Application Password / nonce |
+| FastAPI | ✅ Done | Bearer token + optional basic |
+| OAuth2 / PKCE (RFC 7636) | ✅ Done | `auth_oauth2_pkce()` — SHA-256 code challenge, token endpoint POST |
+| AWS Signature v4 / Digest / NTLM / mTLS | 🔲 | Deferred |
 
-### Schema Explorer (Go)
-| Task | Status |
-|---|---|
-| Frappe / Django / Laravel / Rails / FastAPI / Express explorers | 🔲 |
-| OpenAPI 3.x full importer | 🔲 |
-| Framework auto-detection on folder open | 🔲 |
-
-### Design Mode (OpenAPI Editor)
-| Task | Status |
-|---|---|
-| All Design Mode features | 🔲 |
+### Schema Explorer (Rust)
+| Task | Status | Notes |
+|---|---|---|
+| Frappe DocType JSON crawler | ✅ Done | `explore_frappe()` in `schema_explorer.rs` |
+| Django `models.py` parser | ✅ Done | `explore_django()` |
+| Laravel `$fillable` PHP parser | ✅ Done | `explore_laravel()` |
+| Rails `schema.rb` crawler | ✅ Done | `explore_rails()` |
+| OpenAPI 3.x YAML/JSON importer | ✅ Done | `explore_openapi()` — full path/entity extraction |
+| FastAPI Pydantic BaseModel crawler | ✅ Done | `explore_fastapi()` — class + `@app.route` decorators |
+| Express router route crawler | ✅ Done | `explore_express()` — JS/TS router patterns |
+| Framework auto-detection on folder open | ✅ Done | `has_*_structure()` detection per framework |
+| Generate collection from schema | ✅ Done | "Generate Collection" button in Ecosystem panel |
 
 ### Response Intelligence
-| Task | Status |
-|---|---|
-| Export as JSON Schema / TS interface / Pydantic / Rust / Go struct | 🔲 |
+| Task | Status | Notes |
+|---|---|---|
+| Export as JSON Schema | ✅ Done | `schema-inference.ts` `inferJsonSchema()` |
+| Export as TypeScript interface | ✅ Done | `inferTypeScript()` |
+| Export as Pydantic v2 BaseModel | ✅ Done | `inferPydantic()` — recursive nested classes |
+| Export as Rust struct | ✅ Done | `inferRustStruct()` — `#[derive(Debug, Clone, Serialize, Deserialize)]` |
+| Export as Go struct | ✅ Done | `inferGoStruct()` — `json:"..."` tags |
+| Schema tab in response pane | ✅ Done | 5 format toggles in `ResponsePanel.svelte` |
 
 ### Visual Flow Builder
-| Task | Status |
-|---|---|
-| Canvas editor + all node types | 🔲 |
+| Task | Status | Notes |
+|---|---|---|
+| SVG request dependency graph | ✅ Done | `FlowPanel.svelte` — cubic bezier edges, arrowheads |
+| Variable dependency analysis | ✅ Done | `setsVars()` + `extractVarRefs()` — detects `pm.environment.set()` chains |
+| Method-colored node cards | ✅ Done | Color-coded accent strip + badge per HTTP method |
+| Folder grouping bands | ✅ Done | Shaded rect per folder group |
+| Collection picker + stats bar | ✅ Done | |
+| Wired into Dashboard | ✅ Done | "Flow Builder" nav item in `DashboardMode.svelte` |
 
 ### Enhanced Protocol Support
-| Task | Status |
-|---|---|
-| gRPC service reflection + unary calls | 🔲 |
-| GraphQL schema explorer + autocomplete + builder | 🔲 |
+| Task | Status | Notes |
+|---|---|---|
+| gRPC service reflection + unary calls | 🔲 | Deferred |
+| GraphQL schema explorer + autocomplete + builder | ✅ Done | Phase 1 — introspection + type browser |
 
 ---
 

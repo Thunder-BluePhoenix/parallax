@@ -15,6 +15,7 @@ pub enum EcosystemProvider {
     Rails,
     WordPress,
     FastAPI,
+    OAuth2,
     Generic,
 }
 
@@ -27,6 +28,7 @@ impl EcosystemProvider {
             "rails" | "ruby_on_rails" => Self::Rails,
             "wordpress" | "wp" => Self::WordPress,
             "fastapi" => Self::FastAPI,
+            "oauth2" | "oauth2_pkce" => Self::OAuth2,
             _ => Self::Generic,
         }
     }
@@ -39,6 +41,7 @@ impl EcosystemProvider {
             EcosystemProvider::Rails => "Ruby on Rails",
             EcosystemProvider::WordPress => "WordPress",
             EcosystemProvider::FastAPI => "FastAPI",
+            EcosystemProvider::OAuth2 => "OAuth2 / PKCE",
             EcosystemProvider::Generic => "Generic Session",
         }
     }
@@ -153,6 +156,7 @@ impl AuthProviderManager {
             EcosystemProvider::Rails => self.auth_rails(creds).await,
             EcosystemProvider::WordPress => self.auth_wordpress(creds).await,
             EcosystemProvider::FastAPI => self.auth_fastapi(creds).await,
+            EcosystemProvider::OAuth2 => self.auth_oauth2_pkce(creds).await,
             EcosystemProvider::Generic => self.auth_generic_bearer(creds).await,
         }
     }
@@ -479,6 +483,72 @@ impl AuthProviderManager {
             injected_headers: headers,
             injected_cookies: HashMap::new(),
             session_data: serde_json::json!({ "token_response": body }),
+            expires_at: Some(expires_at),
+        })
+    }
+
+    // =========================================================================
+    // OAUTH2 — Authorization Code + PKCE (RFC 7636)
+    // extra fields used:
+    //   token_url      — required: token endpoint
+    //   client_id      — required
+    //   code           — required: authorization code from redirect
+    //   redirect_uri   — required
+    //   code_verifier  — required: plain code verifier (we hash it to code_challenge)
+    // =========================================================================
+    async fn auth_oauth2_pkce(&self, creds: ProviderCredentials) -> Result<AuthSession> {
+        use base64::{Engine, engine::general_purpose::URL_SAFE_NO_PAD};
+        use sha2::{Sha256, Digest};
+
+        let extra = creds.extra.as_ref().ok_or_else(|| anyhow::anyhow!("OAuth2: extra fields required"))?;
+        let token_url   = extra.get("token_url").ok_or_else(|| anyhow::anyhow!("OAuth2: token_url required"))?;
+        let client_id   = extra.get("client_id").ok_or_else(|| anyhow::anyhow!("OAuth2: client_id required"))?;
+        let code        = extra.get("code").ok_or_else(|| anyhow::anyhow!("OAuth2: code required"))?;
+        let redirect_uri = extra.get("redirect_uri").ok_or_else(|| anyhow::anyhow!("OAuth2: redirect_uri required"))?;
+        let code_verifier = extra.get("code_verifier").ok_or_else(|| anyhow::anyhow!("OAuth2: code_verifier required"))?;
+
+        // Derive code_challenge = BASE64URL(SHA256(code_verifier))
+        let mut hasher = Sha256::new();
+        hasher.update(code_verifier.as_bytes());
+        let challenge = URL_SAFE_NO_PAD.encode(hasher.finalize());
+
+        let mut form = HashMap::new();
+        form.insert("grant_type", "authorization_code".to_string());
+        form.insert("code", code.clone());
+        form.insert("redirect_uri", redirect_uri.clone());
+        form.insert("client_id", client_id.clone());
+        form.insert("code_verifier", code_verifier.clone());
+        form.insert("code_challenge", challenge);
+        form.insert("code_challenge_method", "S256".to_string());
+
+        let resp = self.client.post(token_url).form(&form).send().await?;
+        let body: serde_json::Value = resp.json().await?;
+
+        if let Some(err) = body.get("error").and_then(|e| e.as_str()) {
+            return Err(anyhow::anyhow!("OAuth2 error: {} — {}", err,
+                body.get("error_description").and_then(|d| d.as_str()).unwrap_or("")));
+        }
+
+        let access_token  = body["access_token"].as_str().unwrap_or("").to_string();
+        let refresh_token = body["refresh_token"].as_str().unwrap_or("").to_string();
+        let expires_in    = body["expires_in"].as_i64().unwrap_or(3600);
+        let token_type    = body["token_type"].as_str().unwrap_or("Bearer").to_string();
+        let expires_at    = chrono::Utc::now().timestamp() + expires_in;
+
+        let mut headers = HashMap::new();
+        headers.insert("Authorization".to_string(), format!("{} {}", token_type, access_token));
+
+        Ok(AuthSession {
+            provider: "oauth2".to_string(),
+            base_url: creds.base_url,
+            injected_headers: headers,
+            injected_cookies: HashMap::new(),
+            session_data: serde_json::json!({
+                "access_token": access_token,
+                "refresh_token": refresh_token,
+                "token_type": token_type,
+                "expires_in": expires_in,
+            }),
             expires_at: Some(expires_at),
         })
     }

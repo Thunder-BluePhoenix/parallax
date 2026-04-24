@@ -1,6 +1,6 @@
 /// Parallax HTTP Engine — Rust/reqwest powered HTTP/2+HTTP/3 execution core
 use std::collections::HashMap;
-use std::time::{Duration, Instant};
+use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use reqwest::{Client, Method, Response};
 use serde::{Deserialize, Serialize};
@@ -8,11 +8,12 @@ use anyhow::Result;
 use hmac::{Hmac, Mac};
 use sha2::{Sha256, Digest as Sha2Digest};
 use md5::Md5;
+use md4::Md4;
 type HmacSha256 = Hmac<Sha256>;
+type HmacMd5 = Hmac<Md5>;
 
 fn rand_u32() -> u32 {
-    use std::time::{SystemTime, UNIX_EPOCH};
-    (SystemTime::now().duration_since(UNIX_EPOCH).unwrap_or_default().subsec_nanos()) ^ 0xdeadbeef
+    SystemTime::now().duration_since(UNIX_EPOCH).unwrap_or_default().subsec_nanos() ^ 0xdeadbeef
 }
 
 /// A single HTTP request definition (maps to .parallax YAML)
@@ -86,6 +87,9 @@ pub struct AuthConfig {
     pub aws_secret_key: Option<String>,
     pub aws_region: Option<String>,
     pub aws_service: Option<String>,
+    // NTLM fields
+    pub ntlm_domain: Option<String>,
+    pub ntlm_workstation: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -102,6 +106,8 @@ pub enum AuthType {
     AwsSigV4,
     /// HTTP Digest authentication (RFC 7617)
     Digest,
+    /// NTLM / NTLMv2 (Windows domains, IIS, SSPI-compatible servers)
+    Ntlm,
 }
 
 /// The result returned to the Svelte frontend
@@ -306,6 +312,55 @@ impl HttpEngine {
                         builder2 = self.apply_body(builder2, body, env)?;
                     }
                     response = builder2.send().await?;
+                }
+            }
+        }
+
+        // NTLM auth — 3-way handshake: negotiate → challenge → authenticate
+        if let Some(auth) = &req.auth {
+            if auth.auth_type == AuthType::Ntlm {
+                let username = Self::resolve_env(auth.username.as_deref().unwrap_or(""), env);
+                let password = Self::resolve_env(auth.password.as_deref().unwrap_or(""), env);
+                let domain = Self::resolve_env(auth.ntlm_domain.as_deref().unwrap_or(""), env);
+                let workstation = Self::resolve_env(auth.ntlm_workstation.as_deref().unwrap_or(""), env);
+                let method_str = req.method.to_uppercase();
+
+                // Step 1 — send NEGOTIATE
+                let negotiate_b64 = Self::ntlm_negotiate_msg(&domain, &workstation);
+                let method1 = Method::from_bytes(method_str.as_bytes()).unwrap_or(Method::GET);
+                let mut b1 = self.client.request(method1, reqwest::Url::parse(&resolved_url)?);
+                if let Some(ms) = req.timeout_ms { b1 = b1.timeout(Duration::from_millis(ms)); }
+                for (k, v) in &req.headers {
+                    b1 = b1.header(Self::resolve_env(k, env), Self::resolve_env(v, env));
+                }
+                b1 = b1.header("Authorization", format!("NTLM {}", negotiate_b64));
+                let r1 = b1.send().await?;
+
+                // Step 2 — parse CHALLENGE from server
+                if r1.status() == 401 {
+                    if let Some(challenge_hdr) = r1.headers().get("www-authenticate").cloned() {
+                        let challenge_str = challenge_hdr.to_str().unwrap_or("").to_string();
+                        if let Some(b64) = challenge_str.strip_prefix("NTLM ").map(|s| s.trim()) {
+                            if let Ok(challenge_bytes) = base64::Engine::decode(
+                                &base64::engine::general_purpose::STANDARD, b64) {
+                                // Step 3 — build AUTHENTICATE
+                                let auth_b64 = Self::ntlm_authenticate_msg(
+                                    &username, &password, &domain, &workstation, &challenge_bytes,
+                                );
+                                let method3 = Method::from_bytes(method_str.as_bytes()).unwrap_or(Method::GET);
+                                let mut b3 = self.client.request(method3, reqwest::Url::parse(&resolved_url)?);
+                                if let Some(ms) = req.timeout_ms { b3 = b3.timeout(Duration::from_millis(ms)); }
+                                for (k, v) in &req.headers {
+                                    b3 = b3.header(Self::resolve_env(k, env), Self::resolve_env(v, env));
+                                }
+                                b3 = b3.header("Authorization", format!("NTLM {}", auth_b64));
+                                if let Some(body) = &req.body {
+                                    b3 = self.apply_body(b3, body, env)?;
+                                }
+                                response = b3.send().await?;
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -561,6 +616,166 @@ impl HttpEngine {
             header.push_str(&format!(r#", opaque="{}""#, opaque));
         }
         header
+    }
+
+    // ── NTLM helpers ─────────────────────────────────────────────────────────
+
+    fn utf16le(s: &str) -> Vec<u8> {
+        s.encode_utf16().flat_map(|c| c.to_le_bytes()).collect()
+    }
+
+    fn nt_hash(password: &str) -> Vec<u8> {
+        let pw_utf16 = Self::utf16le(password);
+        let hash = Md4::digest(&pw_utf16);
+        hash.to_vec()
+    }
+
+    fn ntlmv2_hash(nt_hash: &[u8], username: &str, domain: &str) -> Vec<u8> {
+        let identity = Self::utf16le(&format!("{}{}", username.to_uppercase(), domain));
+        let mut mac = HmacMd5::new_from_slice(nt_hash).expect("HMAC key ok");
+        mac.update(&identity);
+        mac.finalize().into_bytes().to_vec()
+    }
+
+    fn write_u16le(buf: &mut Vec<u8>, v: u16) { buf.extend_from_slice(&v.to_le_bytes()); }
+    fn write_u32le(buf: &mut Vec<u8>, v: u32) { buf.extend_from_slice(&v.to_le_bytes()); }
+
+    fn ntlm_security_buffer(buf: &mut Vec<u8>, offset: u32, data: &[u8]) {
+        let len = data.len() as u16;
+        Self::write_u16le(buf, len);   // length
+        Self::write_u16le(buf, len);   // max length
+        Self::write_u32le(buf, offset); // offset
+    }
+
+    /// Build NTLM NEGOTIATE_MESSAGE (Type 1)
+    fn ntlm_negotiate_msg(domain: &str, workstation: &str) -> String {
+        let mut msg: Vec<u8> = Vec::new();
+        msg.extend_from_slice(b"NTLMSSP\0");  // signature
+        Self::write_u32le(&mut msg, 1);        // MessageType = 1
+        // Negotiate flags: NTLM + Unicode + OEM + RequestTarget + NTLM + AlwaysSign + ExtendedSecurity + Version
+        let flags: u32 = 0x60088215;
+        Self::write_u32le(&mut msg, flags);
+        // Domain and workstation security buffers (empty, at offset 40)
+        let base_offset = 40u32;
+        let dom_bytes = domain.as_bytes();
+        let ws_bytes  = workstation.as_bytes();
+        Self::ntlm_security_buffer(&mut msg, base_offset, dom_bytes);
+        Self::ntlm_security_buffer(&mut msg, base_offset + dom_bytes.len() as u32, ws_bytes);
+        // Version (8 bytes) — Windows 10 / NTLM revision 15
+        msg.extend_from_slice(&[0x0a, 0x00, 0x63, 0x45, 0x00, 0x00, 0x00, 0x0f]);
+        msg.extend_from_slice(dom_bytes);
+        msg.extend_from_slice(ws_bytes);
+        base64::Engine::encode(&base64::engine::general_purpose::STANDARD, &msg)
+    }
+
+    /// Parse server challenge (8 bytes) from CHALLENGE_MESSAGE (Type 2)
+    fn parse_ntlm_challenge(challenge_msg: &[u8]) -> Option<([u8; 8], Vec<u8>)> {
+        // Challenge is at offset 24, TargetInfo at offset specified in message
+        if challenge_msg.len() < 56 { return None; }
+        let mut sc = [0u8; 8];
+        sc.copy_from_slice(&challenge_msg[24..32]);
+
+        // TargetInfo security buffer at offset 40: len(2) + maxlen(2) + offset(4)
+        let ti_len  = u16::from_le_bytes([challenge_msg[40], challenge_msg[41]]) as usize;
+        let ti_off  = u32::from_le_bytes([challenge_msg[44], challenge_msg[45], challenge_msg[46], challenge_msg[47]]) as usize;
+        let target_info = if ti_off + ti_len <= challenge_msg.len() {
+            challenge_msg[ti_off..ti_off + ti_len].to_vec()
+        } else {
+            vec![]
+        };
+        Some((sc, target_info))
+    }
+
+    /// Build NTLM AUTHENTICATE_MESSAGE (Type 3) with NTLMv2 response
+    fn ntlm_authenticate_msg(
+        username: &str, password: &str, domain: &str, workstation: &str,
+        challenge_msg: &[u8],
+    ) -> String {
+        let (server_challenge, target_info) = match Self::parse_ntlm_challenge(challenge_msg) {
+            Some(v) => v,
+            None => ([0u8; 8], vec![]),
+        };
+
+        let nt_h = Self::nt_hash(password);
+        let ntv2_h = Self::ntlmv2_hash(&nt_h, username, domain);
+
+        // NTLMv2 blob
+        let client_challenge: [u8; 8] = {
+            let t = SystemTime::now().duration_since(UNIX_EPOCH).unwrap_or_default().subsec_nanos();
+            let b = t.to_le_bytes();
+            [b[0], b[1], b[2], b[3], b[4], b[5], b[6], b[7]]
+        };
+
+        // Windows FILETIME (100ns intervals since 1601-01-01)
+        let filetime: u64 = {
+            let unix_secs = SystemTime::now()
+                .duration_since(UNIX_EPOCH).unwrap_or_default().as_secs();
+            (unix_secs + 11644473600) * 10_000_000
+        };
+
+        let mut blob: Vec<u8> = Vec::new();
+        blob.extend_from_slice(&[0x01, 0x01, 0x00, 0x00]); // blob signature
+        blob.extend_from_slice(&[0x00, 0x00, 0x00, 0x00]); // reserved
+        blob.extend_from_slice(&filetime.to_le_bytes());    // timestamp
+        blob.extend_from_slice(&client_challenge);
+        blob.extend_from_slice(&[0x00, 0x00, 0x00, 0x00]); // reserved
+        blob.extend_from_slice(&target_info);
+        blob.extend_from_slice(&[0x00, 0x00, 0x00, 0x00]); // trailing
+
+        // NTProofStr = HMAC-MD5(ntv2_h, server_challenge || blob)
+        let mut mac = HmacMd5::new_from_slice(&ntv2_h).expect("HMAC key ok");
+        mac.update(&server_challenge);
+        mac.update(&blob);
+        let nt_proof: Vec<u8> = mac.finalize().into_bytes().to_vec();
+
+        // NTChallengeResponse = NTProofStr || blob
+        let mut nt_response = nt_proof.clone();
+        nt_response.extend_from_slice(&blob);
+
+        // LMv2 response (simplified — use NTProofStr + zeros)
+        let mut lm_response = nt_proof.clone();
+        lm_response.extend_from_slice(&client_challenge);
+
+        // Session base key
+        let mut mac2 = HmacMd5::new_from_slice(&ntv2_h).expect("HMAC key ok");
+        mac2.update(&nt_proof);
+        let _session_base_key = mac2.finalize().into_bytes();
+
+        // Encode fields
+        let user_utf16  = Self::utf16le(username);
+        let dom_utf16   = Self::utf16le(domain);
+        let ws_utf16    = Self::utf16le(workstation);
+
+        // Build message with security buffers
+        // Fixed header = 12 (signature + type) + 4 (flags) = layout below
+        // Layout: sig(8) + type(4) + LmChallengeResponseFields(8) + NtChallengeResponseFields(8)
+        //         + DomainNameFields(8) + UserNameFields(8) + WorkstationFields(8)
+        //         + EncryptedRandomSessionKeyFields(8) + NegotiateFlags(4) = 72 bytes header
+        let header_len: u32 = 72;
+        let lm_off  = header_len;
+        let nt_off  = lm_off + lm_response.len() as u32;
+        let dom_off = nt_off + nt_response.len() as u32;
+        let usr_off = dom_off + dom_utf16.len() as u32;
+        let ws_off  = usr_off + user_utf16.len() as u32;
+        let key_off = ws_off  + ws_utf16.len() as u32;
+
+        let mut msg: Vec<u8> = Vec::new();
+        msg.extend_from_slice(b"NTLMSSP\0");
+        Self::write_u32le(&mut msg, 3); // MessageType = 3
+        Self::ntlm_security_buffer(&mut msg, lm_off,  &lm_response);
+        Self::ntlm_security_buffer(&mut msg, nt_off,  &nt_response);
+        Self::ntlm_security_buffer(&mut msg, dom_off, &dom_utf16);
+        Self::ntlm_security_buffer(&mut msg, usr_off, &user_utf16);
+        Self::ntlm_security_buffer(&mut msg, ws_off,  &ws_utf16);
+        Self::ntlm_security_buffer(&mut msg, key_off, &[]); // encrypted session key (empty)
+        Self::write_u32le(&mut msg, 0x60088215); // NegotiateFlags
+        msg.extend_from_slice(&lm_response);
+        msg.extend_from_slice(&nt_response);
+        msg.extend_from_slice(&dom_utf16);
+        msg.extend_from_slice(&user_utf16);
+        msg.extend_from_slice(&ws_utf16);
+
+        base64::Engine::encode(&base64::engine::general_purpose::STANDARD, &msg)
     }
 
     async fn parse_response(

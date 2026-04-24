@@ -131,7 +131,7 @@ Phase 5    ░░░░░░░░░░░░░░░░░░░░   0%  �
 | AWS SigV4 | ✅ Done | HMAC-SHA256 signing chain in `http_engine.rs`; `AwsSigV4` AuthType |
 | Digest auth | ✅ Done | RFC 7617 MD5 challenge-response in `http_engine.rs`; `Digest` AuthType |
 | mTLS (client certs) | ✅ Done | `client_cert_pem` / `client_key_pem` fields on `ParallaxRequest` |
-| NTLM | ⚠️ Deferred | Windows-specific; no cross-platform Rust crate available |
+| NTLM | ✅ Done | Pure-Rust NTLMv2 in `http_engine.rs` — negotiate/challenge/authenticate handshake; `Ntlm` AuthType |
 
 ### Svelte 5 Builder Mode UI
 | Task | Status | Notes |
@@ -449,7 +449,7 @@ Phase 5    ░░░░░░░░░░░░░░░░░░░░   0%  �
 | AWS Signature v4 | ✅ Done | `AwsSigV4` AuthType in `http_engine.rs` — full HMAC-SHA256 signing chain |
 | Digest auth | ✅ Done | `Digest` AuthType — RFC 7617 MD5 challenge-response |
 | mTLS | ✅ Done | `client_cert_pem` / `client_key_pem` on `ParallaxRequest` |
-| NTLM | ⚠️ Deferred | Windows-only; no cross-platform Rust crate |
+| NTLM | ✅ Done | Pure-Rust NTLMv2 (3-way handshake); MD4 NT-hash + HMAC-MD5 NTLMv2 response |
 
 ### Schema Explorer (Rust)
 | Task | Status | Notes |
@@ -488,7 +488,7 @@ Phase 5    ░░░░░░░░░░░░░░░░░░░░   0%  �
 | Task | Status | Notes |
 |---|---|---|
 | gRPC unary + server streaming | ✅ Done | `GRPCPane.svelte` + `commands/grpc.rs` — HTTP/2 grpc+json framing |
-| gRPC service reflection (proto descriptors) | ⚠️ Deferred | Requires protobuf descriptor pool; deferred |
+| gRPC service reflection (proto descriptors) | ✅ Done | `grpc_reflect` command — hand-decoded protobuf, ListServices + FileContainingSymbol; "Reflect" button in GRPCPane populates method picker |
 | GraphQL schema explorer + autocomplete + builder | ✅ Done | Phase 1 — introspection + type browser |
 
 ---

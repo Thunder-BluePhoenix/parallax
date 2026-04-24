@@ -32,6 +32,27 @@
   let unlistenMsg: UnlistenFn | null = null;
   let unlistenEnd: UnlistenFn | null = null;
 
+  // Reflection state
+  let reflectedMethods = $state<string[]>([]);
+  let reflecting = $state(false);
+  let reflectError = $state<string | null>(null);
+
+  async function reflect() {
+    if (!serverAddr) return;
+    reflecting = true; reflectError = null; reflectedMethods = [];
+    try {
+      reflectedMethods = await invoke<string[]>("grpc_reflect", { serverAddr, tlsSkipVerify });
+      if (reflectedMethods.length === 0) reflectError = "No services found (server may not support reflection)";
+    } catch (e: any) {
+      reflectError = String(e);
+    } finally {
+      reflecting = false;
+    }
+  }
+
+  function pickMethod(m: string) { methodPath = m; }
+
+
   function parseMetadata(): Record<string, string> {
     const out: Record<string, string> = {};
     for (const line of metadataRaw.split("\n")) {
@@ -133,10 +154,25 @@
       placeholder="package.Service/Method"
       title="Fully-qualified method path"
     />
+    <button class="btn-reflect" onclick={reflect} disabled={reflecting || !serverAddr} title="Discover methods via server reflection">
+      {reflecting ? "…" : "Reflect"}
+    </button>
     <button class="btn-invoke" onclick={send} disabled={loading || !serverAddr || !methodPath}>
       {loading ? "Invoking…" : "Invoke"}
     </button>
   </div>
+
+  <!-- Reflection method picker -->
+  {#if reflectedMethods.length > 0}
+    <div class="reflect-list">
+      {#each reflectedMethods as m}
+        <button class="reflect-method mono" class:active={methodPath === m} onclick={() => pickMethod(m)}>{m}</button>
+      {/each}
+    </div>
+  {/if}
+  {#if reflectError}
+    <div class="reflect-error">{reflectError}</div>
+  {/if}
 
   <!-- Options row -->
   <div class="grpc-options">
@@ -273,6 +309,16 @@
   .grpc-method { flex: 1.2; }
   .grpc-sep { color: var(--text-muted); font-size: 18px; }
 
+  .btn-reflect {
+    height: 32px; padding: 0 12px;
+    background: transparent; color: var(--accent-secondary);
+    border: 1px solid var(--accent-secondary); opacity: 0.8;
+    font-size: 11px; font-weight: 700; border-radius: var(--radius-md);
+    white-space: nowrap;
+  }
+  .btn-reflect:hover:not(:disabled) { opacity: 1; background: rgba(100,160,255,0.08); }
+  .btn-reflect:disabled { opacity: 0.35; }
+
   .btn-invoke {
     height: 32px; padding: 0 18px;
     background: var(--accent-primary); color: white;
@@ -280,6 +326,20 @@
     white-space: nowrap;
   }
   .btn-invoke:disabled { opacity: 0.5; }
+
+  .reflect-list {
+    display: flex; flex-wrap: wrap; gap: 4px;
+    padding: 6px 16px; background: var(--bg-surface);
+    border-bottom: 1px solid var(--border-default);
+  }
+  .reflect-method {
+    padding: 2px 8px; font-size: 10px;
+    background: var(--bg-elevated); border: 1px solid var(--border-default);
+    border-radius: var(--radius-sm); color: var(--text-secondary);
+  }
+  .reflect-method:hover { border-color: var(--accent-primary); color: var(--accent-primary); }
+  .reflect-method.active { background: var(--accent-primary-dim); color: var(--accent-primary); border-color: var(--accent-primary); }
+  .reflect-error { font-size: 11px; color: var(--color-warning); padding: 4px 16px; background: var(--bg-surface); border-bottom: 1px solid var(--border-default); }
 
   .grpc-options {
     display: flex; gap: 12px; align-items: center;

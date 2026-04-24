@@ -36,6 +36,7 @@ pub fn run() {
             // gRPC
             commands::grpc::grpc_unary,
             commands::grpc::grpc_server_stream,
+            commands::grpc::grpc_reflect,
             // File utilities
             commands::workspace::read_file_for_template,
             // Persistence

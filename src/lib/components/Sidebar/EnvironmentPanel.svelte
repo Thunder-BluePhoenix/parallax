@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { activeEnvironment, currentWorkspace } from "../../stores/app.svelte";
+  import { activeEnvironment, currentWorkspace, activeRequest } from "../../stores/app.svelte";
   import { invoke } from "@tauri-apps/api/core";
 
   let { onclose }: { onclose: () => void } = $props();
@@ -13,6 +13,49 @@
 
   function addRow() { pairs.push({ k: "", v: "", secret: false }); }
   function removeRow(i: number) { pairs.splice(i, 1); }
+
+  // ── Smart variable extraction from active request ────────────
+  function suggestFromRequest() {
+    const req = activeRequest;
+    if (!req) return;
+    const suggestions: { k: string; v: string }[] = [];
+    const existing = new Set(pairs.map(p => p.k));
+
+    // Extract base URL
+    try {
+      const u = new URL(req.url);
+      const baseKey = "base_url";
+      if (!existing.has(baseKey)) {
+        suggestions.push({ k: baseKey, v: `${u.protocol}//${u.host}` });
+        existing.add(baseKey);
+      }
+    } catch {}
+
+    // Extract auth header tokens
+    const authHeader = req.headers?.["Authorization"] ?? req.headers?.["authorization"] ?? "";
+    if (authHeader.startsWith("Bearer ")) {
+      const key = "auth_token";
+      if (!existing.has(key)) suggestions.push({ k: key, v: authHeader.slice(7) });
+    } else if (authHeader.startsWith("Basic ")) {
+      const key = "basic_credentials";
+      if (!existing.has(key)) suggestions.push({ k: key, v: authHeader.slice(6) });
+    }
+
+    // Extract API key headers
+    for (const [k, v] of Object.entries(req.headers ?? {})) {
+      if (/api[-_]?key|x-api-key/i.test(k)) {
+        const varName = k.toLowerCase().replace(/[-\s]/g, "_");
+        if (!existing.has(varName)) {
+          suggestions.push({ k: varName, v: String(v) });
+          existing.add(varName);
+        }
+      }
+    }
+
+    for (const s of suggestions) {
+      pairs.push({ ...s, secret: /token|key|secret|password/i.test(s.k) });
+    }
+  }
 
   function apply() {
     const vars: Record<string, string> = {};
@@ -119,7 +162,10 @@
       {/each}
     </div>
 
-    <button class="add-pair-btn" onclick={addRow}>+ Add variable</button>
+    <div class="add-row">
+      <button class="add-pair-btn" onclick={addRow}>+ Add variable</button>
+      <button class="add-pair-btn suggest-btn" onclick={suggestFromRequest} title="Extract variables from active request">⚡ Suggest from request</button>
+    </div>
 
     <div class="env-actions">
       <button class="btn-cancel" onclick={onclose}>Cancel</button>
@@ -356,6 +402,9 @@
     transition: var(--transition-fast);
   }
   .add-pair-btn:hover { color: #9185ff; }
+
+  .add-row { display: flex; gap: 4px; flex-shrink: 0; }
+  .suggest-btn { color: var(--accent-secondary); font-size: 10px; }
 
   .env-actions {
     display: flex;

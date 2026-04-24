@@ -5,6 +5,15 @@ use std::time::{Duration, Instant};
 use reqwest::{Client, Method, Response};
 use serde::{Deserialize, Serialize};
 use anyhow::Result;
+use hmac::{Hmac, Mac};
+use sha2::{Sha256, Digest as Sha2Digest};
+use md5::Md5;
+type HmacSha256 = Hmac<Sha256>;
+
+fn rand_u32() -> u32 {
+    use std::time::{SystemTime, UNIX_EPOCH};
+    (SystemTime::now().duration_since(UNIX_EPOCH).unwrap_or_default().subsec_nanos()) ^ 0xdeadbeef
+}
 
 /// A single HTTP request definition (maps to .parallax YAML)
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -72,6 +81,11 @@ pub struct AuthConfig {
     /// Provider-specific context (e.g., "frappe", "django", "laravel")
     pub provider: Option<String>,
     pub provider_session: Option<serde_json::Value>,
+    // AWS SigV4 fields
+    pub aws_access_key: Option<String>,
+    pub aws_secret_key: Option<String>,
+    pub aws_region: Option<String>,
+    pub aws_service: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -84,6 +98,10 @@ pub enum AuthType {
     OAuth2,
     /// Ecosystem-specific (Frappe, Django, Laravel, Rails, WordPress...)
     EcosystemProvider,
+    /// AWS Signature Version 4
+    AwsSigV4,
+    /// HTTP Digest authentication (RFC 7617)
+    Digest,
 }
 
 /// The result returned to the Svelte frontend
@@ -253,7 +271,45 @@ impl HttpEngine {
             builder = self.apply_body(builder, body, env)?;
         }
 
-        let response = builder.send().await?;
+        // AWS SigV4 — sign after body is set
+        if let Some(auth) = &req.auth {
+            if auth.auth_type == AuthType::AwsSigV4 {
+                builder = self.apply_sigv4(builder, auth, &req.method, &resolved_url, req, env)?;
+            }
+        }
+
+        let mut response = builder.send().await?;
+
+        // Digest auth — 401 challenge-response
+        if let Some(auth) = &req.auth {
+            if auth.auth_type == AuthType::Digest && response.status() == 401 {
+                if let Some(www_auth) = response.headers().get("www-authenticate").cloned() {
+                    let www_auth_str = www_auth.to_str().unwrap_or("").to_string();
+                    // Rebuild request with Digest header
+                    let method_str = req.method.to_uppercase();
+                    let uri_path = reqwest::Url::parse(&resolved_url)
+                        .map(|u| u.path().to_string())
+                        .unwrap_or_else(|_| "/".to_string());
+                    let digest_header = Self::build_digest_header(
+                        auth, env, &method_str, &uri_path, &www_auth_str,
+                    );
+                    let method2 = Method::from_bytes(method_str.as_bytes()).unwrap_or(Method::GET);
+                    let mut builder2 = self.client.request(method2, reqwest::Url::parse(&resolved_url)?);
+                    if let Some(ms) = req.timeout_ms {
+                        builder2 = builder2.timeout(Duration::from_millis(ms));
+                    }
+                    for (k, v) in &req.headers {
+                        builder2 = builder2.header(Self::resolve_env(k, env), Self::resolve_env(v, env));
+                    }
+                    builder2 = builder2.header("Authorization", digest_header);
+                    if let Some(body) = &req.body {
+                        builder2 = self.apply_body(builder2, body, env)?;
+                    }
+                    response = builder2.send().await?;
+                }
+            }
+        }
+
         let elapsed = start.elapsed();
 
         self.parse_response(response, elapsed).await
@@ -346,6 +402,165 @@ impl HttpEngine {
             }
             _ => Ok(builder),
         }
+    }
+
+    fn hmac_sha256(key: &[u8], data: &[u8]) -> Vec<u8> {
+        let mut mac = HmacSha256::new_from_slice(key).expect("HMAC key len ok");
+        mac.update(data);
+        mac.finalize().into_bytes().to_vec()
+    }
+
+    fn sha256_hex(data: &[u8]) -> String {
+        let hash = Sha256::digest(data);
+        hex::encode(hash)
+    }
+
+    fn apply_sigv4(
+        &self,
+        builder: reqwest::RequestBuilder,
+        auth: &AuthConfig,
+        method: &str,
+        url_str: &str,
+        req: &ParallaxRequest,
+        env: &HashMap<String, String>,
+    ) -> Result<reqwest::RequestBuilder> {
+        let access_key = auth.aws_access_key.as_deref().unwrap_or("");
+        let secret_key = auth.aws_secret_key.as_deref().unwrap_or("");
+        let region = Self::resolve_env(auth.aws_region.as_deref().unwrap_or("us-east-1"), env);
+        let service = Self::resolve_env(auth.aws_service.as_deref().unwrap_or("execute-api"), env);
+
+        let access_key = Self::resolve_env(access_key, env);
+        let secret_key = Self::resolve_env(secret_key, env);
+
+        let parsed = reqwest::Url::parse(url_str)?;
+        let canonical_uri = parsed.path().to_string();
+        let canonical_query = parsed.query().unwrap_or("").to_string();
+
+        // Body hash
+        let body_bytes = if let Some(body) = &req.body {
+            serde_json::to_vec(&body.content).unwrap_or_default()
+        } else {
+            vec![]
+        };
+        let payload_hash = Self::sha256_hex(&body_bytes);
+
+        let now = chrono::Utc::now();
+        let datestamp = now.format("%Y%m%d").to_string();
+        let amzdate = now.format("%Y%m%dT%H%M%SZ").to_string();
+
+        // Canonical headers
+        let host = parsed.host_str().unwrap_or("");
+        let canonical_headers = format!(
+            "host:{}\nx-amz-content-sha256:{}\nx-amz-date:{}\n",
+            host, payload_hash, amzdate
+        );
+        let signed_headers = "host;x-amz-content-sha256;x-amz-date";
+
+        let canonical_request = format!(
+            "{}\n{}\n{}\n{}\n{}\n{}",
+            method.to_uppercase(),
+            canonical_uri,
+            canonical_query,
+            canonical_headers,
+            signed_headers,
+            payload_hash,
+        );
+
+        let credential_scope = format!("{}/{}/{}/aws4_request", datestamp, region, service);
+        let string_to_sign = format!(
+            "AWS4-HMAC-SHA256\n{}\n{}\n{}",
+            amzdate,
+            credential_scope,
+            Self::sha256_hex(canonical_request.as_bytes()),
+        );
+
+        // Signing key derivation
+        let signing_key = {
+            let k_date = Self::hmac_sha256(
+                format!("AWS4{}", secret_key).as_bytes(),
+                datestamp.as_bytes(),
+            );
+            let k_region = Self::hmac_sha256(&k_date, region.as_bytes());
+            let k_service = Self::hmac_sha256(&k_region, service.as_bytes());
+            Self::hmac_sha256(&k_service, b"aws4_request")
+        };
+
+        let signature = hex::encode(Self::hmac_sha256(&signing_key, string_to_sign.as_bytes()));
+
+        let auth_header = format!(
+            "AWS4-HMAC-SHA256 Credential={}/{}, SignedHeaders={}, Signature={}",
+            access_key, credential_scope, signed_headers, signature,
+        );
+
+        Ok(builder
+            .header("x-amz-date", &amzdate)
+            .header("x-amz-content-sha256", &payload_hash)
+            .header("Authorization", auth_header))
+    }
+
+    fn build_digest_header(
+        auth: &AuthConfig,
+        env: &HashMap<String, String>,
+        method: &str,
+        uri: &str,
+        www_auth: &str,
+    ) -> String {
+        let username = Self::resolve_env(auth.username.as_deref().unwrap_or(""), env);
+        let password = Self::resolve_env(auth.password.as_deref().unwrap_or(""), env);
+
+        // Parse WWW-Authenticate: Digest realm="...", nonce="...", qop="...", opaque="..."
+        fn extract<'a>(src: &'a str, key: &str) -> &'a str {
+            let search = format!("{}=\"", key);
+            if let Some(start) = src.find(&search) {
+                let rest = &src[start + search.len()..];
+                if let Some(end) = rest.find('"') {
+                    return &rest[..end];
+                }
+            }
+            ""
+        }
+
+        let realm = extract(www_auth, "realm");
+        let nonce = extract(www_auth, "nonce");
+        let opaque = extract(www_auth, "opaque");
+        let qop_str = extract(www_auth, "qop");
+        let use_auth_qop = qop_str.contains("auth");
+
+        let ha1 = {
+            let mut h = Md5::new();
+            h.update(format!("{}:{}:{}", username, realm, password).as_bytes());
+            hex::encode(h.finalize())
+        };
+        let ha2 = {
+            let mut h = Md5::new();
+            h.update(format!("{}:{}", method, uri).as_bytes());
+            hex::encode(h.finalize())
+        };
+
+        let nc = "00000001";
+        let cnonce = format!("{:x}", rand_u32());
+
+        let response_hash = if use_auth_qop {
+            let mut h = Md5::new();
+            h.update(format!("{}:{}:{}:{}:auth:{}", ha1, nonce, nc, cnonce, ha2).as_bytes());
+            hex::encode(h.finalize())
+        } else {
+            let mut h = Md5::new();
+            h.update(format!("{}:{}:{}", ha1, nonce, ha2).as_bytes());
+            hex::encode(h.finalize())
+        };
+
+        let mut header = format!(
+            r#"Digest username="{}", realm="{}", nonce="{}", uri="{}", response="{}""#,
+            username, realm, nonce, uri, response_hash,
+        );
+        if use_auth_qop {
+            header.push_str(&format!(r#", qop=auth, nc={}, cnonce="{}""#, nc, cnonce));
+        }
+        if !opaque.is_empty() {
+            header.push_str(&format!(r#", opaque="{}""#, opaque));
+        }
+        header
     }
 
     async fn parse_response(

@@ -107,7 +107,7 @@ Phase 5    ░░░░░░░░░░░░░░░░░░░░   0%  �
 | Import from Postman Collection v2.1 JSON | ✅ Done | Requests, folders, auth, body |
 | Import from Insomnia v4 export JSON | ✅ Done | |
 | Import from curl command (URL bar paste) | ✅ Done | |
-| Import from OpenAPI 3.x | 🔲 | Phase 4 |
+| Import from OpenAPI 3.x | ✅ Done | `openapi-importer.ts` — JSON spec → Collection; toolbar button in Sidebar |
 | Import from HAR file | ✅ Done | `har-importer.ts` + HAR button in BuilderMode tab bar |
 | Export as Postman JSON | ✅ Done | postman-exporter.ts + sidebar context menu | |
 
@@ -128,7 +128,10 @@ Phase 5    ░░░░░░░░░░░░░░░░░░░░   0%  �
 | Ecosystem provider selector UI (Frappe, Django, Laravel, Rails, WordPress, FastAPI) | ✅ Done | |
 | Frappe / Django stubs | ✅ Done | Full in Phase 4 |
 | OAuth2 / PKCE | ✅ Done | Phase 4 — `auth_oauth2_pkce()` in `auth_providers.rs` |
-| AWS SigV4, Digest, NTLM, mTLS | 🔲 | Deferred |
+| AWS SigV4 | ✅ Done | HMAC-SHA256 signing chain in `http_engine.rs`; `AwsSigV4` AuthType |
+| Digest auth | ✅ Done | RFC 7617 MD5 challenge-response in `http_engine.rs`; `Digest` AuthType |
+| mTLS (client certs) | ✅ Done | `client_cert_pem` / `client_key_pem` fields on `ParallaxRequest` |
+| NTLM | ⚠️ Deferred | Windows-specific; no cross-platform Rust crate available |
 
 ### Svelte 5 Builder Mode UI
 | Task | Status | Notes |
@@ -235,8 +238,8 @@ Phase 5    ░░░░░░░░░░░░░░░░░░░░   0%  �
 | Live Traffic Stream panel | ✅ Done | `LiveTrafficPanel.svelte` — streams from proxy gRPC |
 | Health Heatmap panel | ✅ Done | `HealthHeatmapPanel.svelte` — streams from health gRPC |
 | Load Test Results panel | ✅ Done | `LoadTestPanel.svelte` — RPS chart + latency histogram |
-| Git Sync Status panel | 🔲 | Phase 2.5 |
-| Collection Run History panel | 🔲 | |
+| Git Sync Status panel | ✅ Done | `GitPanel.svelte` in Dashboard — git status, commit, push, pull, branch management |
+| Collection Run History panel | ✅ Done | "Run History" section in `DashboardMode.svelte` — `responseHistory` cards with status/timing |
 
 ### Go Local Proxy (Rust commands wired to gRPC)
 | Task | Status | Notes |
@@ -246,7 +249,7 @@ Phase 5    ░░░░░░░░░░░░░░░░░░░░   0%  �
 | HTTPS MITM with local CA cert | ✅ Done | `src-go/proxy/ca.go` (100 lines) — CA cert gen; `/parallax/ca.crt` download endpoint |
 | Traffic filter by domain/method/status | ✅ Done | Go `SetFilter()` + gRPC + Rust `set_proxy_filter` + UI domain include/exclude fields |
 | Export as HAR | ✅ Done | Client-side HAR 1.2 + Go `ExportHAR()`; "Export HAR" button in LiveTrafficPanel |
-| Replay captured request | 🔲 | |
+| Replay captured request | ✅ Done | "Replay" button in `LiveTrafficPanel.svelte` — calls `loadRequestIntoTab` + switches to builder |
 
 ### Health Monitor (Rust commands wired to gRPC)
 | Task | Status | Notes |
@@ -406,7 +409,7 @@ Phase 5    ░░░░░░░░░░░░░░░░░░░░   0%  �
 | AI request repair (4xx/5xx) | ✅ Done | Response panel "Diagnose with AI" → `ai_repair_request` → diagnosis + fix list |
 | AI collection creator | ✅ Done | `AISettingsPanel` textarea → `ai_create_collection` → YAML output + copy |
 | AI script assistant | ✅ Done | Scripts tab prompt bar → `generateScript` → inserts into pre-request or test editor |
-| AI env variable suggestion | 🔲 | Deferred to Phase 4 |
+| AI env variable suggestion | ✅ Done | "⚡ Suggest from request" button in `EnvironmentPanel.svelte` — extracts base_url, auth tokens, API key headers |
 
 ### MCP Server
 | Task | Status | Notes |
@@ -443,7 +446,10 @@ Phase 5    ░░░░░░░░░░░░░░░░░░░░   0%  �
 | WordPress | ✅ Done | Application Password / nonce |
 | FastAPI | ✅ Done | Bearer token + optional basic |
 | OAuth2 / PKCE (RFC 7636) | ✅ Done | `auth_oauth2_pkce()` — SHA-256 code challenge, token endpoint POST |
-| AWS Signature v4 / Digest / NTLM / mTLS | 🔲 | Deferred |
+| AWS Signature v4 | ✅ Done | `AwsSigV4` AuthType in `http_engine.rs` — full HMAC-SHA256 signing chain |
+| Digest auth | ✅ Done | `Digest` AuthType — RFC 7617 MD5 challenge-response |
+| mTLS | ✅ Done | `client_cert_pem` / `client_key_pem` on `ParallaxRequest` |
+| NTLM | ⚠️ Deferred | Windows-only; no cross-platform Rust crate |
 
 ### Schema Explorer (Rust)
 | Task | Status | Notes |
@@ -481,7 +487,8 @@ Phase 5    ░░░░░░░░░░░░░░░░░░░░   0%  �
 ### Enhanced Protocol Support
 | Task | Status | Notes |
 |---|---|---|
-| gRPC service reflection + unary calls | 🔲 | Deferred |
+| gRPC unary + server streaming | ✅ Done | `GRPCPane.svelte` + `commands/grpc.rs` — HTTP/2 grpc+json framing |
+| gRPC service reflection (proto descriptors) | ⚠️ Deferred | Requires protobuf descriptor pool; deferred |
 | GraphQL schema explorer + autocomplete + builder | ✅ Done | Phase 1 — introspection + type browser |
 
 ---

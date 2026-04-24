@@ -29,6 +29,8 @@
   import EnvironmentPanel from "./EnvironmentPanel.svelte";
   import { importPostmanCollection, importInsomniaExport } from "../../utils/postman-importer";
   import { exportPostmanCollection } from "../../utils/postman-exporter";
+  import { importOpenAPI } from "../../utils/openapi-importer";
+  import { importHar } from "../../utils/har-importer";
 
   let searchQuery   = $state("");
   const uuid = () => Math.random().toString(36).substring(2) + Date.now().toString(36);
@@ -252,6 +254,16 @@
   }
 
   // ── Import collection ──────────────────────────────────────
+  async function saveImportedCollection(col: any) {
+    if (currentWorkspace.path) {
+      await invoke("save_collection", { workspace: currentWorkspace.path, collection: col });
+      await loadCollections(currentWorkspace.path);
+    } else {
+      loadedCollections.push(col);
+      expandedCols[col.name] = true;
+    }
+  }
+
   async function importCollection(e: Event) {
     importError = "";
     const file = (e.target as HTMLInputElement).files?.[0];
@@ -264,15 +276,37 @@
       } else {
         col = importPostmanCollection(text);
       }
-      if (currentWorkspace.path) {
-        await invoke("save_collection", { workspace: currentWorkspace.path, collection: col });
-        await loadCollections(currentWorkspace.path);
-      } else {
-        loadedCollections.push(col);
-        expandedCols[col.name] = true;
-      }
+      await saveImportedCollection(col);
     } catch (err: any) {
       importError = err?.message ?? "Import failed";
+    }
+    (e.target as HTMLInputElement).value = "";
+  }
+
+  async function importOpenAPIFile(e: Event) {
+    importError = "";
+    const file = (e.target as HTMLInputElement).files?.[0];
+    if (!file) return;
+    const text = await file.text();
+    try {
+      const col = importOpenAPI(text, file.name.replace(/\.[^.]+$/, ""));
+      await saveImportedCollection(col);
+    } catch (err: any) {
+      importError = err?.message ?? "OpenAPI import failed";
+    }
+    (e.target as HTMLInputElement).value = "";
+  }
+
+  async function importHarFile(e: Event) {
+    importError = "";
+    const file = (e.target as HTMLInputElement).files?.[0];
+    if (!file) return;
+    const text = await file.text();
+    try {
+      const col = importHar(text, file.name.replace(/\.[^.]+$/, ""));
+      await saveImportedCollection(col);
+    } catch (err: any) {
+      importError = err?.message ?? "HAR import failed";
     }
     (e.target as HTMLInputElement).value = "";
   }
@@ -353,6 +387,21 @@
         <line x1="12" y1="15" x2="12" y2="3"/>
       </svg>
       <input type="file" accept=".json" style="display:none" onchange={importCollection} />
+    </label>
+    <label class="icon-btn" title="Import OpenAPI 3.x (JSON)">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+        <polyline points="14 2 14 8 20 8"/>
+        <line x1="9" y1="13" x2="15" y2="13"/>
+        <line x1="9" y1="17" x2="13" y2="17"/>
+      </svg>
+      <input type="file" accept=".json,.yaml,.yml" style="display:none" onchange={importOpenAPIFile} />
+    </label>
+    <label class="icon-btn" title="Import HAR archive">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
+      </svg>
+      <input type="file" accept=".har,.json" style="display:none" onchange={importHarFile} />
     </label>
   </div>
   {#if importError}

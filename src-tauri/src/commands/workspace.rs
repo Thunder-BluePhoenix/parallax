@@ -99,7 +99,7 @@ pub async fn get_current_branch(path: String) -> Result<Option<String>, String> 
 #[tauri::command]
 pub async fn read_file_for_template(path: String) -> Result<String, String> {
     std::fs::read_to_string(&path)
-        .map_err(|e| format!("{% file '{}' %}: {}", path, e))
+        .map_err(|e| format!("{{% file '{}' %}}: {}", path, e))
 }
 
 fn count_files_with_ext(dir: &PathBuf, ext: &str) -> usize {

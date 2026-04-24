@@ -122,6 +122,21 @@ jobs:
           name: worker-${{ matrix.platform.worker-target }}
           path: src-tauri/binaries/
 
+      - name: Rename worker binary to Tauri triple format (Unix)
+        if: runner.os != 'Windows'
+        run: |
+          src="src-tauri/binaries/parallax-worker-${{ matrix.platform.worker-target }}"
+          dst="src-tauri/binaries/parallax-worker-${{ matrix.platform.target }}"
+          [ -f "$src" ] && mv "$src" "$dst" && chmod +x "$dst" || true
+
+      - name: Rename worker binary to Tauri triple format (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $src = "src-tauri/binaries/parallax-worker-${{ matrix.platform.worker-target }}.exe"
+          $dst = "src-tauri/binaries/parallax-worker-${{ matrix.platform.target }}.exe"
+          if (Test-Path $src) { Move-Item $src $dst }
+
       - name: Install npm dependencies
         run: npm ci
 

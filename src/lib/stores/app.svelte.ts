@@ -140,6 +140,40 @@ export function persistTabs() {
   catch { /* ignore */ }
 }
 
+// Per-tab request snapshots — keyed by tab id
+const tabSnapshots = $state<Record<string, Partial<RequestState>>>({});
+
+function snapshotDefault(): Partial<RequestState> {
+  return { name: "New Request", method: "GET", url: "", headers: {}, params: {},
+           bodyType: "none", bodyContent: "", auth: defaultAuth() };
+}
+
+/** Save current activeRequest into the snapshot for tabId */
+export function saveTabSnapshot(tabId: string) {
+  tabSnapshots[tabId] = {
+    id: activeRequest.id, name: activeRequest.name, method: activeRequest.method,
+    url: activeRequest.url, headers: { ...activeRequest.headers },
+    params: { ...activeRequest.params }, bodyType: activeRequest.bodyType,
+    bodyContent: activeRequest.bodyContent, auth: { ...activeRequest.auth },
+  };
+}
+
+/** Restore activeRequest from snapshot for tabId (or blank if none) */
+export function restoreTabSnapshot(tabId: string) {
+  const snap = tabSnapshots[tabId] ?? snapshotDefault();
+  activeRequest.id          = snap.id ?? tabId;
+  activeRequest.name        = snap.name ?? "New Request";
+  activeRequest.method      = snap.method ?? "GET";
+  activeRequest.url         = snap.url ?? "";
+  activeRequest.headers     = { ...(snap.headers ?? {}) };
+  activeRequest.params      = { ...(snap.params ?? {}) };
+  activeRequest.bodyType    = snap.bodyType ?? "none";
+  activeRequest.bodyContent = snap.bodyContent ?? "";
+  activeRequest.auth        = snap.auth ? { ...snap.auth } : defaultAuth();
+  responseState.response    = null;
+  responseState.error       = null;
+}
+
 export const authSessions = $state<Record<string, any>>({});
 
 // ============================================================

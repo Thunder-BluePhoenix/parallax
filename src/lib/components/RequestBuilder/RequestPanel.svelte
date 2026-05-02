@@ -1,5 +1,7 @@
 <script lang="ts">
-  import { invoke } from "@tauri-apps/api/core";
+  import { invoke as _invoke } from "@tauri-apps/api/core";
+  const invoke = <T>(cmd: string, args?: Record<string, any>): Promise<T> =>
+    (_invoke ?? (window as any)?.__TAURI__?.core?.invoke)(cmd, args);
   import { activeRequest, activeScripts } from "../../stores/app.svelte";
   import { generateScript, aiStatus } from "../../stores/ai.svelte";
 
@@ -27,13 +29,56 @@
 
   const TABS = ["Params", "Headers", "Body", "Auth", "Scripts"];
 
-  function addHeader() {
-    activeRequest.headers = { ...activeRequest.headers, "": "" };
+  // ── KV row helpers (use id-keyed arrays so duplicate empty keys work) ──────
+  interface KVRow { id: number; k: string; v: string; }
+  let nextId = 0;
+
+  function objToRows(obj: Record<string, string>): KVRow[] {
+    return Object.entries(obj).map(([k, v]) => ({ id: nextId++, k, v }));
+  }
+  function rowsToObj(rows: KVRow[]): Record<string, string> {
+    const out: Record<string, string> = {};
+    for (const r of rows) if (r.k) out[r.k] = r.v;
+    return out;
   }
 
-  function removeHeader(key: string) {
-    const { [key]: _, ...rest } = activeRequest.headers;
-    activeRequest.headers = rest;
+  let paramRows = $state<KVRow[]>(objToRows(activeRequest.params ?? {}));
+  let headerRows = $state<KVRow[]>(objToRows(activeRequest.headers ?? {}));
+
+  // Only re-sync rows when the request identity changes (different request loaded),
+  // not when we ourselves write to activeRequest.params/headers.
+  let lastRequestId = activeRequest.id;
+  $effect(() => {
+    const id = activeRequest.id;
+    if (id !== lastRequestId) {
+      lastRequestId = id;
+      paramRows = objToRows(activeRequest.params ?? {});
+      headerRows = objToRows(activeRequest.headers ?? {});
+    }
+  });
+
+  function updateParamRow(id: number, field: "k" | "v", value: string) {
+    const row = paramRows.find(r => r.id === id);
+    if (row) { row[field] = value; activeRequest.params = rowsToObj(paramRows); }
+  }
+  function addParam() {
+    paramRows.push({ id: nextId++, k: "", v: "" });
+  }
+  function removeParam(id: number) {
+    paramRows = paramRows.filter(r => r.id !== id);
+    activeRequest.params = rowsToObj(paramRows);
+  }
+
+  function updateHeaderRow(id: number, field: "k" | "v", value: string) {
+    const row = headerRows.find(r => r.id === id);
+    if (row) { row[field] = value; activeRequest.headers = rowsToObj(headerRows); }
+  }
+  function addHeader() {
+    headerRows.push({ id: nextId++, k: "", v: "" });
+  }
+  function removeHeader(id: number) {
+    headerRows = headerRows.filter(r => r.id !== id);
+    activeRequest.headers = rowsToObj(headerRows);
   }
 
   let scriptTab = $state<"pre" | "tests">("pre");
@@ -130,21 +175,16 @@
           <span>Key</span>
           <span>Value</span>
         </div>
-        {#each Object.entries(activeRequest.params) as [key, val]}
+        {#each paramRows as row (row.id)}
           <div class="kv-row">
-            <input class="kv-input mono" type="text" value={key} placeholder="key" />
-            <input class="kv-input mono" type="text" value={val} placeholder="value" />
-            <button class="kv-remove" onclick={() => {
-              const { [key]: _, ...rest } = activeRequest.params;
-              activeRequest.params = rest;
-            }}>×</button>
+            <input class="kv-input mono" type="text" value={row.k} placeholder="key"
+              oninput={(e) => updateParamRow(row.id, "k", (e.target as HTMLInputElement).value)} />
+            <input class="kv-input mono" type="text" value={row.v} placeholder="value"
+              oninput={(e) => updateParamRow(row.id, "v", (e.target as HTMLInputElement).value)} />
+            <button class="kv-remove" onclick={() => removeParam(row.id)}>×</button>
           </div>
         {/each}
-        <button class="add-row-btn" onclick={() => {
-          activeRequest.params = { ...activeRequest.params, "": "" };
-        }}>
-          + Add parameter
-        </button>
+        <button class="add-row-btn" onclick={addParam}>+ Add parameter</button>
       </div>
 
     {:else if activeTab === "headers"}
@@ -153,16 +193,16 @@
           <span>Key</span>
           <span>Value</span>
         </div>
-        {#each Object.entries(activeRequest.headers) as [key, val]}
+        {#each headerRows as row (row.id)}
           <div class="kv-row">
-            <input class="kv-input mono" type="text" value={key} placeholder="header name" />
-            <input class="kv-input mono" type="text" value={val} placeholder="value" />
-            <button class="kv-remove" onclick={() => removeHeader(key)}>×</button>
+            <input class="kv-input mono" type="text" value={row.k} placeholder="header name"
+              oninput={(e) => updateHeaderRow(row.id, "k", (e.target as HTMLInputElement).value)} />
+            <input class="kv-input mono" type="text" value={row.v} placeholder="value"
+              oninput={(e) => updateHeaderRow(row.id, "v", (e.target as HTMLInputElement).value)} />
+            <button class="kv-remove" onclick={() => removeHeader(row.id)}>×</button>
           </div>
         {/each}
-        <button class="add-row-btn" onclick={addHeader}>
-          + Add header
-        </button>
+        <button class="add-row-btn" onclick={addHeader}>+ Add header</button>
       </div>
 
     {:else if activeTab === "body"}

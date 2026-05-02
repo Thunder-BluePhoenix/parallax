@@ -47,6 +47,6 @@
     "shell": {
       "open": "^https?://"
     },
-    "dialog": {}
+    "dialog": null
   }
 }

@@ -8,6 +8,8 @@
   let selected = $state(0);
   let inputEl: HTMLInputElement;
 
+  $effect(() => { inputEl?.focus(); });
+
   interface Command {
     id: string;
     label: string;
@@ -144,8 +146,8 @@
   }
 </script>
 
-<div class="palette-backdrop" onclick={onclose} role="presentation">
-  <div class="palette" onclick={(e) => e.stopPropagation()} role="dialog" aria-label="Command palette">
+<div class="palette-backdrop" onclick={onclose} onkeydown={(e) => e.key === 'Escape' && onclose()} role="presentation" tabindex="-1">
+  <div class="palette" onclick={(e) => e.stopPropagation()} onkeydown={(e) => e.stopPropagation()} role="dialog" aria-label="Command palette" tabindex="-1">
     <div class="palette-input-row">
       <svg class="palette-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
         <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
@@ -157,7 +159,6 @@
         placeholder="Search commands or requests…"
         bind:value={query}
         onkeydown={onKeyDown}
-        autofocus
       />
       <kbd class="palette-esc">Esc</kbd>
     </div>

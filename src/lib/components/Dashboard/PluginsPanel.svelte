@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { pluginRegistry } from "../../utils/plugin-api";
+  import { pluginRegistry } from "../../utils/plugin-api.svelte";
 
   let customId  = $state("");
   let customSrc = $state("");

@@ -1,7 +1,7 @@
 // Parallax Global App State — Svelte 5 Runes
 console.log("[Parallax] Store module loading...");
 import { invoke } from "@tauri-apps/api/core";
-import { resolveRequestTemplates } from "../utils/template-tags";
+import { resolveRequestTemplates, resolveShellTagsInObj } from "../utils/template-tags";
 
 const uuid = () => Math.random().toString(36).substring(2) + Date.now().toString(36);
 
@@ -369,11 +369,13 @@ export async function sendRequest() {
   try {
     // Merge scopes: Global -> Collection -> Environment
     // Local script variables will mutate this merged object during pre-request
-    const mergedEnv = {
+    const rawEnv = {
       ...globalVariables.variables,
       ...collectionVariables.variables,
       ...activeEnvironment.variables,
     };
+    // Resolve {% shell 'cmd' %} tags in env values first (output may contain {{vars}})
+    const mergedEnv = await resolveShellTagsInObj(rawEnv) as Record<string, string>;
 
     // Run pre-request script
     if (activeScripts.preRequest.trim()) {
@@ -381,7 +383,8 @@ export async function sendRequest() {
       await runPreRequestScript(activeScripts.preRequest, mergedEnv);
     }
 
-    const rawPayload = await resolveFileTagsInObj(buildPayload());
+    // Resolve shell tags in payload before file tags and template resolution
+    const rawPayload = await resolveShellTagsInObj(await resolveFileTagsInObj(buildPayload()));
     // Ensure varjson requests carry the correct content-type header
     if (activeRequest.bodyType === "varjson" && !rawPayload.headers?.["Content-Type"]) {
       rawPayload.headers = { ...rawPayload.headers, "Content-Type": "application/json" };

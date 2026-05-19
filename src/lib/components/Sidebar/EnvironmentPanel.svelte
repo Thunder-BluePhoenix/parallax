@@ -92,6 +92,10 @@
 
   $effect(() => { if (activeTab === "diff") loadEnvsForDiff(); });
 
+  // ── Shell tag security ──────────────────────────────────────
+  const hasShellTags = $derived(pairs.some(p => p.v.includes("{% shell")));
+  let shellWarningDismissed = $state(false);
+
   const compareEnv = $derived(savedEnvs.find(e => e.name === compareEnvName));
 
   interface DiffRow {
@@ -132,6 +136,17 @@
       <label for="env-name" class="field-label">Name</label>
       <input id="env-name" type="text" bind:value={envName} placeholder="dev" />
     </div>
+
+    {#if hasShellTags && !shellWarningDismissed}
+      <div class="shell-warning">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+          <line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
+        </svg>
+        <span>This environment runs shell commands at request send-time. Only activate environments you trust.</span>
+        <button class="shell-warn-dismiss" onclick={() => (shellWarningDismissed = true)}>Got it</button>
+      </div>
+    {/if}
 
     <div class="pairs-header">
       <span>Key</span>
@@ -435,4 +450,32 @@
     color: white;
   }
   .btn-apply:hover { background: #9185ff; }
+
+  .shell-warning {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    background: rgba(224, 108, 117, 0.12);
+    border: 1px solid rgba(224, 108, 117, 0.4);
+    border-radius: var(--radius-md);
+    padding: 10px 12px;
+    margin-bottom: 10px;
+    font-size: 11px;
+    color: #e06c75;
+    line-height: 1.5;
+  }
+  .shell-warning svg { flex-shrink: 0; margin-top: 1px; }
+  .shell-warning span { flex: 1; }
+  .shell-warn-dismiss {
+    flex-shrink: 0;
+    background: transparent;
+    border: 1px solid rgba(224, 108, 117, 0.5);
+    color: #e06c75;
+    border-radius: var(--radius-sm);
+    font-size: 10px;
+    padding: 2px 8px;
+    cursor: pointer;
+    white-space: nowrap;
+  }
+  .shell-warn-dismiss:hover { background: rgba(224, 108, 117, 0.15); }
 </style>

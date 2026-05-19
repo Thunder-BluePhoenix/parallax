@@ -17,3 +17,4 @@ pub mod git;
 pub mod github;
 pub mod chat;
 pub mod grpc;
+pub mod templates;

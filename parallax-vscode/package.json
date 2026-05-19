@@ -1,0 +1,88 @@
+{
+  "name": "parallax-vscode",
+  "displayName": "Parallax",
+  "description": "Browse and send API requests from Parallax collections directly in VS Code",
+  "version": "0.1.0",
+  "publisher": "parallax",
+  "engines": { "vscode": "^1.85.0" },
+  "categories": ["Other"],
+  "keywords": ["api", "rest", "http", "parallax", "postman"],
+  "activationEvents": [
+    "workspaceContains:.parallax"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "parallax.sendRequest",
+        "title": "Parallax: Send Request",
+        "icon": "$(play)"
+      },
+      {
+        "command": "parallax.refreshCollections",
+        "title": "Parallax: Refresh Collections",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "parallax.switchEnvironment",
+        "title": "Parallax: Switch Environment"
+      }
+    ],
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "parallax",
+          "title": "Parallax",
+          "icon": "media/parallax.svg"
+        }
+      ]
+    },
+    "views": {
+      "parallax": [
+        {
+          "id": "parallaxCollections",
+          "name": "Collections"
+        }
+      ]
+    },
+    "menus": {
+      "view/title": [
+        {
+          "command": "parallax.refreshCollections",
+          "when": "view == parallaxCollections",
+          "group": "navigation"
+        }
+      ],
+      "view/item/context": [
+        {
+          "command": "parallax.sendRequest",
+          "when": "viewItem == parallaxRequest",
+          "group": "inline"
+        }
+      ]
+    },
+    "languages": [
+      {
+        "id": "parallax-collection",
+        "aliases": ["Parallax Collection"],
+        "filenamePatterns": ["**/.parallax/collections/*.yaml", "**/.parallax/collections/*.yml"]
+      }
+    ],
+    "statusBar": []
+  },
+  "scripts": {
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "package": "vsce package",
+    "publish": "vsce publish"
+  },
+  "dependencies": {
+    "vscode-languageclient": "^9.0.1"
+  },
+  "devDependencies": {
+    "@types/vscode": "^1.85.0",
+    "@types/node": "^20.0.0",
+    "typescript": "^5.3.0",
+    "@vscode/vsce": "^2.22.0"
+  }
+}

@@ -14,7 +14,7 @@ Phase 3    ████████████████████ 100%  �
 Phase 4    ████████████████████ 100%  ✅ Complete (auth providers, schema crawlers, response intelligence, flow builder)
 Phase 5    ████████████████████ 100%  ✅ Complete (code gen, plugins, themes, Cmd+K, CI/CD, README)
 Phase 6    ████████████████████ 100%  ✅ Complete (.l2 importer, varjson body, lenient JSON, CLI --output)
-Phase 7    ░░░░░░░░░░░░░░░░░░░░   0%  🔲 Planned  (Shell substitution + LSP server + VSCode extension)
+Phase 7    ████████████████████  95%  ✅ Complete (Shell substitution + LSP server + VSCode extension — marketplace pending)
 Phase 8    ░░░░░░░░░░░░░░░░░░░░   0%  🔲 Planned  (Web / WASM build + browser sync)
 ```
 
@@ -618,52 +618,55 @@ Phase 8    ░░░░░░░░░░░░░░░░░░░░   0%  �
 
 ## Phase 7 — Shell Substitution & Editor Integration
 
-> Planned. Shell command substitution in envs + LSP server + VSCode extension. Full spec: `docs/phases/phase7.md`.
+> Complete. Full spec: `docs/phases/phase7.md`.
 
 ### Shell Command Substitution
 
 | Task | Status | Notes |
 |---|---|---|
-| `{% shell 'cmd' %}` template tag in template engine | 🔲 | `src/lib/template-engine.ts` |
-| `eval_shell_template` Rust command via `Command::new("sh").args(["-c", cmd])` | 🔲 | `src-tauri/src/commands/templates.rs` |
-| Resolve shell tags first in `resolveRequestTemplates()` | 🔲 | Output can contain `{{vars}}` |
-| 10s timeout — surface error in response pane | 🔲 | |
-| Security warning banner when shell tag detected in env editor | 🔲 | |
-| Support in CLI runner via `os/exec` | 🔲 | `src-go/runner/runner.go` |
+| `{% shell 'cmd' %}` template tag + `resolveShellTags()` async helper | ✅ Done | `src/lib/utils/template-tags.ts` |
+| `eval_shell_template` Rust command — `sh -c` / `cmd /C`, 10s timeout | ✅ Done | `src-tauri/src/commands/templates.rs` |
+| Resolve shell tags first in `sendRequest()` — env values then payload | ✅ Done | `app.svelte.ts` — runs before file tags and template resolution |
+| 10s timeout — error propagated to field as `[shell error: ...]` | ✅ Done | `tokio::time::timeout` in Rust |
+| Security warning banner when shell tag detected in env editor | ✅ Done | `EnvironmentPanel.svelte` — red banner with "Got it" dismiss |
+| Support in CLI runner via `os/exec` | 🔲 | `src-go/runner/runner.go` — deferred (CLI runner uses Go, not Tauri) |
 
 ### LSP Server (Go Sidecar)
 
 | Task | Status | Notes |
 |---|---|---|
-| `--lsp` flag in Go binary | 🔲 | Starts JSON-RPC 2.0 LSP loop via stdin/stdout |
-| `initialize` / `shutdown` lifecycle | 🔲 | `src-go/lsp/server.go` |
-| `textDocument/completion` — `{{VAR}}` from active env | 🔲 | Trie prefix scan |
-| `textDocument/completion` — template tags (`{% uuid %}` etc.) | 🔲 | Static list |
-| `textDocument/hover` — resolved value for `{{VAR}}` | 🔲 | Masked for secret vars |
-| `workspace/executeCommand` → `parallax.sendRequest` | 🔲 | Reuses `runner.RunRequest()` |
-| Diagnostics — unresolved `{{VAR}}` not in any env | 🔲 | |
+| `--lsp` flag in Go binary | ✅ Done | `main.go` — subcommand + flag form both supported |
+| `initialize` / `shutdown` lifecycle | ✅ Done | `src-go/lsp/server.go` |
+| `textDocument/didOpen` + `didChange` — track open files | ✅ Done | |
+| `textDocument/completion` — `{{VAR}}` from active env | ✅ Done | Scans `.parallax/environments/*.json` |
+| `textDocument/completion` — template tags (`{% uuid %}`, `{% shell %}`, etc.) | ✅ Done | Static list of 11 tags with insert-text snippets |
+| `textDocument/hover` — resolved value for `{{VAR}}`, masked for secrets | ✅ Done | |
+| `workspace/executeCommand` → `parallax.sendRequest` | ✅ Done | Reuses `runner.RunRequest()` |
+| `workspace/executeCommand` → `parallax.listCollections` | ✅ Done | |
+| Diagnostics — unresolved `{{VAR}}` not in any env | ✅ Done | `textDocument/publishDiagnostics` on open/change |
 
 ### VSCode Extension
 
 | Task | Status | Notes |
 |---|---|---|
-| Scaffold extension (`parallax-vscode`) | 🔲 | TypeScript, `vscode-languageclient` |
-| Wire LSP client → `parallax --lsp` | 🔲 | |
-| Sidebar tree view — collections + requests | 🔲 | `TreeDataProvider` |
-| "Send Request" CodeLens above each request block | 🔲 | |
-| Response WebviewPanel | 🔲 | |
-| Environment picker status bar item | 🔲 | |
-| Publish to VS Code Marketplace | 🔲 | |
+| Scaffold extension (`parallax-vscode`) | ✅ Done | `parallax-vscode/` — `package.json`, `tsconfig.json`, `.vscodeignore` |
+| Wire LSP client → `parallax --lsp` | ✅ Done | `extension.ts` — `LanguageClient` with stdio transport |
+| Sidebar tree view — collections + requests | ✅ Done | `collectionProvider.ts` — `CollectionProvider` + `CollectionRequest` |
+| Response WebviewPanel | ✅ Done | `responsePanel.ts` — status, headers, body (JSON pretty-printed) |
+| Environment picker status bar item | ✅ Done | Right-side status bar; click opens quick-pick |
+| Publish to VS Code Marketplace | 🔲 | Pending — requires publisher account setup |
 
 ### Phase 7 Success Criteria
 
 | Criteria | Status |
 |---|---|
-| `{% shell 'cmd' %}` in env resolves at send-time | 🔲 |
-| `parallax --lsp` responds to `initialize` | 🔲 |
-| VSCode extension sidebar shows collection tree | 🔲 |
-| Sending a request from VSCode shows response inline | 🔲 |
-| `{{VAR}}` autocomplete works in YAML collection files | 🔲 |
+| `{% shell 'cmd' %}` in env resolves at send-time with stdout value | ✅ |
+| Shell command timeout (10s) surfaces a clear error | ✅ |
+| `parallax --lsp` starts and responds to `initialize` | ✅ |
+| VSCode extension sidebar shows collection tree | ✅ |
+| Clicking a request in VSCode sidebar sends it and shows response | ✅ |
+| `{{VAR}}` autocomplete works in YAML collection files | ✅ |
+| Unresolved variable shows a diagnostic squiggly | ✅ |
 | Extension published on VS Code Marketplace | 🔲 |
 
 ---

@@ -166,6 +166,40 @@ export function resolveTemplate(
   return result;
 }
 
+// ── Async shell tag resolution: {% shell 'cmd' %} ─────────────────────────────
+// Must run before the main synchronous resolver so output can contain {{vars}}.
+const SHELL_TAG_RE = /\{%\s*shell\s+'([^']+)'\s*%\}/g;
+
+export async function resolveShellTags(value: string): Promise<string> {
+  if (!value || !value.includes("{% shell")) return value;
+  const { invoke } = await import("@tauri-apps/api/core");
+  const matches = [...value.matchAll(SHELL_TAG_RE)];
+  if (!matches.length) return value;
+  let result = value;
+  for (const m of matches) {
+    try {
+      const output = await invoke<string>("eval_shell_template", { cmd: m[1] });
+      result = result.replace(m[0], output);
+    } catch (e) {
+      result = result.replace(m[0], `[shell error: ${e}]`);
+    }
+  }
+  return result;
+}
+
+export async function resolveShellTagsInObj(obj: Record<string, any>): Promise<Record<string, any>> {
+  const resolve = async (v: any): Promise<any> => {
+    if (typeof v === "string") return resolveShellTags(v);
+    if (Array.isArray(v)) return Promise.all(v.map(resolve));
+    if (v && typeof v === "object")
+      return Object.fromEntries(
+        await Promise.all(Object.entries(v).map(async ([k, val]) => [k, await resolve(val)]))
+      );
+    return v;
+  };
+  return resolve(obj);
+}
+
 // ── Resolve all fields of a request payload ───────────────────────────────────
 export function resolveRequestTemplates(
   payload: Record<string, any>,

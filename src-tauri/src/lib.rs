@@ -83,6 +83,7 @@ pub fn run() {
             commands::mock::remove_mock_rule,
             commands::mock::list_mock_rules,
             commands::mock::mock_import_from_traffic,
+            commands::templates::eval_shell_template,
             // Dashboard (Proxy & Health)
             commands::proxy::start_proxy_stream,
             commands::proxy::get_proxy_traffic,

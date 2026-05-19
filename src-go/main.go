@@ -17,6 +17,7 @@ import (
 	"github.com/bluephoenix/parallax-worker/chat"
 	"github.com/bluephoenix/parallax-worker/health"
 	"github.com/bluephoenix/parallax-worker/loadtest"
+	"github.com/bluephoenix/parallax-worker/lsp"
 	"github.com/bluephoenix/parallax-worker/mcp"
 	"github.com/bluephoenix/parallax-worker/mock"
 	"github.com/bluephoenix/parallax-worker/models"
@@ -54,6 +55,17 @@ func main() {
 			return
 		case "init":
 			handleCLIInit(os.Args[2:])
+			return
+		case "--lsp", "lsp":
+			lsp.New().Run()
+			return
+		}
+	}
+
+	// Flag-based LSP mode: parallax --lsp
+	for _, arg := range os.Args[1:] {
+		if arg == "--lsp" {
+			lsp.New().Run()
 			return
 		}
 	}

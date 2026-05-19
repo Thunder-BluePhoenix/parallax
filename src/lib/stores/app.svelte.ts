@@ -1,6 +1,6 @@
 // Parallax Global App State — Svelte 5 Runes
 console.log("[Parallax] Store module loading...");
-import { invoke } from "@tauri-apps/api/core";
+import { sendRequest as platformSendRequest, cancelRequest as platformCancelRequest, readFileForTemplate } from "../platform";
 import { resolveRequestTemplates, resolveShellTagsInObj } from "../utils/template-tags";
 
 const uuid = () => Math.random().toString(36).substring(2) + Date.now().toString(36);
@@ -307,7 +307,7 @@ async function resolveFileTags(text: string): Promise<string> {
   let result = text;
   for (const m of matches) {
     try {
-      const content = await invoke<string>("read_file_for_template", { path: m[1] });
+      const content = await readFileForTemplate(m[1]);
       result = result.replace(m[0], content);
     } catch { /* leave the tag as-is if file unreadable */ }
   }
@@ -330,7 +330,7 @@ async function resolveFileTagsInObj(obj: any): Promise<any> {
 // ============================================================
 export async function cancelRequest() {
   const id = activeRequest.id;
-  try { await invoke("cancel_request", { requestId: id }); } catch { /* ignore */ }
+  try { await platformCancelRequest(id); } catch { /* ignore */ }
   responseState.loading = false;
   responseState.error   = "Request cancelled";
 }
@@ -408,10 +408,7 @@ export async function sendRequest() {
       jsonNormalised.value = false;
     }
 
-    const result = await invoke<any>("send_request", {
-      request:     payload,
-      environment: mergedEnv,
-    });
+    const result = await platformSendRequest(payload, mergedEnv);
 
     const response: ResponseState = {
       status:     result.status,

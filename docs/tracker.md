@@ -15,7 +15,7 @@ Phase 4    ████████████████████ 100%  �
 Phase 5    ████████████████████ 100%  ✅ Complete (code gen, plugins, themes, Cmd+K, CI/CD, README)
 Phase 6    ████████████████████ 100%  ✅ Complete (.l2 importer, varjson body, lenient JSON, CLI --output)
 Phase 7    ████████████████████  95%  ✅ Complete (Shell substitution + LSP server + VSCode extension — marketplace pending)
-Phase 8    ░░░░░░░░░░░░░░░░░░░░   0%  🔲 Planned  (Web / WASM build + browser sync)
+Phase 8    ████████████████░░░░  80%  🔄 In Progress (Web / WASM build + browser sync)
 ```
 
 ---
@@ -673,45 +673,51 @@ Phase 8    ░░░░░░░░░░░░░░░░░░░░   0%  �
 
 ## Phase 8 — Web / WASM
 
-> Planned. Go HTTP engine compiled to WebAssembly + browser-hosted Parallax app. Full spec: `docs/phases/phase8.md`.
+> In Progress. Go HTTP engine compiled to WebAssembly + browser-hosted Parallax app. Full spec: `docs/phases/phase8.md`.
 
 ### Go WASM Build
 
 | Task | Status | Notes |
 |---|---|---|
-| `src-go/wasm/wasm.go` entry point | 🔲 | `GOOS=js GOARCH=wasm` |
-| Expose `parallaxSendRequest(json)` via `syscall/js` | 🔲 | |
-| Expose `parallaxConvertToCode(json, lang)` via `syscall/js` | 🔲 | |
-| Bundle `wasm_exec.js` | 🔲 | |
-| Publish `parallax.wasm` as GitHub release asset | 🔲 | |
+| `src-go/wasm/wasm.go` entry point | ✅ Done | `GOOS=js GOARCH=wasm`; pure `net/http` — no sqlite/gRPC |
+| Expose `parallaxSendRequest(reqJSON, envJSON)` via `syscall/js` | ✅ Done | Returns `Promise<string>` (JSON response) |
+| Expose `parallaxConvertToCode(reqJSON, lang)` via `syscall/js` | ✅ Done | curl / python / javascript snippets |
+| `npm run build:wasm` script | ✅ Done | Copies `wasm_exec.js` from GOROOT automatically |
+| Publish `parallax.wasm` as GitHub release asset | 🔲 | CI step — deploy pipeline |
 
 ### Web App Shell
 
 | Task | Status | Notes |
 |---|---|---|
-| `src/lib/platform.ts` — Tauri invoke vs WASM abstraction | 🔲 | |
-| Replace all `invoke("send_request")` calls with `platform.sendRequest()` | 🔲 | ~15 call sites |
-| GitHub API read/write for collections and environments | 🔲 | |
-| `npm run build:web` — separate Vite config | 🔲 | |
-| GitHub OAuth App redirect flow (replaces Device Flow for browser) | 🔲 | |
-| Deploy to GitHub Pages / Cloudflare Pages | 🔲 | |
-| Feature-flag desktop-only capabilities in web build | 🔲 | Proxy, health, load tester, gRPC |
+| `src/lib/platform.ts` — Tauri invoke vs WASM abstraction | ✅ Done | `IS_TAURI` flag; lazy WASM loader |
+| Replace all `invoke("send_request")` call sites with `platform.sendRequest()` | ✅ Done | `app.svelte.ts`, `pm-script-runner.ts` |
+| Replace `invoke("cancel_request")` with `platform.cancelRequest()` | ✅ Done | no-op in browser |
+| Replace `invoke("read_file_for_template")` with `platform.readFileForTemplate()` | ✅ Done | returns `""` in browser |
+| Replace `invoke("eval_shell_template")` with `platform.evalShellTemplate()` | ✅ Done | returns `""` in browser with warning |
+| `src/lib/utils/github-sync.ts` — GitHub API read/write | ✅ Done | Device Flow + OAuth redirect; pull/push collections & envs |
+| Browser shims for `@tauri-apps/api` packages | ✅ Done | `src/lib/shims/tauri-{core,dialog,fs}.ts` |
+| `vite.config.web.ts` + `npm run build:web` / `dev:web` | ✅ Done | outputs to `dist-web/` |
+| GitHub OAuth App redirect flow (browser auth) | ✅ Done | `startOAuthRedirect` + `finishOAuthRedirect` in `github-sync.ts` |
+| Deploy to GitHub Pages / Cloudflare Pages | 🔲 | CI/CD step |
+| Feature-flag desktop-only capabilities in web build | 🔲 | Proxy, health, load tester, gRPC panels |
 
 ### CORS Proxy Mode
 
 | Task | Status | Notes |
 |---|---|---|
-| Cloudflare Worker proxy endpoint (`POST /proxy`) | 🔲 | |
-| CORS error detection + retry via proxy with user confirmation | 🔲 | |
-| Self-hosted proxy URL in settings | 🔲 | |
+| Cloudflare Worker: `POST /exchange` (OAuth code swap) | ✅ Done | `workers/cors-proxy/index.js` |
+| Cloudflare Worker: `ANY /proxy/*` transparent CORS proxy | ✅ Done | Forwards arbitrary HTTP; adds CORS headers |
+| `wrangler.toml` with secret placeholders | ✅ Done | |
+| CORS error detection + retry via proxy (UI) | 🔲 | Frontend intercept in `ResponsePanel.svelte` |
+| Self-hosted proxy URL in settings | 🔲 | Settings panel + env override |
 
 ### Phase 8 Success Criteria
 
 | Criteria | Status |
 |---|---|
-| `GOOS=js GOARCH=wasm go build` produces working `parallax.wasm` | 🔲 |
-| Web app loads in browser and sends REST requests via WASM | 🔲 |
-| Collections load/save to GitHub repo from browser | 🔲 |
+| `GOOS=js GOARCH=wasm go build` produces working `parallax.wasm` | ✅ Code ready — build to verify |
+| Web app loads in browser and sends REST requests via WASM | ✅ Wired — needs wasm binary to test |
+| Collections load/save to GitHub repo from browser | ✅ Code ready — needs UI integration |
 | CORS-blocked requests surface clear message + proxy retry | 🔲 |
 | Web app deployed on tag push | 🔲 |
 | Works on Chrome, Firefox, and Safari | 🔲 |
@@ -753,6 +759,10 @@ Phase 8    ░░░░░░░░░░░░░░░░░░░░   0%  �
 | 2026-05-19 | LSP server via `parallax --lsp` flag on existing Go binary | Reuses sidecar binary; no separate install for editor users |
 | 2026-05-19 | Web sync uses GitHub API directly, no Parallax cloud | Consistent with existing git-native philosophy; zero infra cost |
 | 2026-05-19 | CORS proxy as Cloudflare Worker, self-hosted URL optional | Zero cold-start; free tier sufficient; privacy-conscious users can self-host |
+| 2026-05-19 | WASM engine is a thin `net/http` wrapper — no sqlite/gRPC in browser build | sqlite doesn't compile to WASM; gRPC not needed; keeps `parallax.wasm` small |
+| 2026-05-19 | `platform.ts` abstraction uses `window.__TAURI__` detection, not build flags | Single JS bundle works in both Tauri webview and browser without two builds |
+| 2026-05-19 | `{% shell %}` and `{% file %}` tags return `""` (with warning) in browser | Security: arbitrary shell execution impossible in browser; file access requires native FS |
+| 2026-05-19 | Browser shims for `@tauri-apps/api` in `src/lib/shims/` | Prevents accidental bundling of Tauri code into web build; all platform calls route through `platform.ts` |
 
 ---
 

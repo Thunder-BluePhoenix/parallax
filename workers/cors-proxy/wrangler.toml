@@ -1,0 +1,8 @@
+name            = "parallax-cors-proxy"
+main            = "index.js"
+compatibility_date = "2024-01-01"
+
+[vars]
+# Override with: wrangler secret put GITHUB_CLIENT_ID
+# GITHUB_CLIENT_ID     = ""
+# GITHUB_CLIENT_SECRET = ""

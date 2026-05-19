@@ -172,13 +172,13 @@ const SHELL_TAG_RE = /\{%\s*shell\s+'([^']+)'\s*%\}/g;
 
 export async function resolveShellTags(value: string): Promise<string> {
   if (!value || !value.includes("{% shell")) return value;
-  const { invoke } = await import("@tauri-apps/api/core");
+  const { evalShellTemplate } = await import("../platform");
   const matches = [...value.matchAll(SHELL_TAG_RE)];
   if (!matches.length) return value;
   let result = value;
   for (const m of matches) {
     try {
-      const output = await invoke<string>("eval_shell_template", { cmd: m[1] });
+      const output = await evalShellTemplate(m[1]);
       result = result.replace(m[0], output);
     } catch (e) {
       result = result.replace(m[0], `[shell error: ${e}]`);

@@ -2,7 +2,7 @@
 // Postman-compatible API surface executed via sandboxed Function()
 
 import type { ResponseState, TestResult } from "../stores/app.svelte";
-import { invoke } from "@tauri-apps/api/core";
+import { sendRequest as platformSendRequest } from "../platform";
 
 // ── pm object factory ─────────────────────────────────────────────────────────
 function buildPm(env: Record<string, string>, response?: ResponseState) {
@@ -64,7 +64,7 @@ function buildPm(env: Record<string, string>, response?: ResponseState) {
       if (options.body?.raw) {
         (req as any).body = { type: "json", content: null, raw: options.body.raw };
       }
-      invoke<any>("send_request", { request: req, environment: env })
+      platformSendRequest(req, env)
         .then(result => {
           const res = {
             code: result.status,

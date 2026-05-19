@@ -32,6 +32,7 @@
   import { exportPostmanCollection } from "../../utils/postman-exporter";
   import { importOpenAPI } from "../../utils/openapi-importer";
   import { importHar } from "../../utils/har-importer";
+  import { importL2Collection } from "../../utils/l2-importer";
 
   let searchQuery   = $state("");
   const uuid = () => Math.random().toString(36).substring(2) + Date.now().toString(36);
@@ -313,6 +314,26 @@
     (e.target as HTMLInputElement).value = "";
   }
 
+  async function importL2Files(e: Event) {
+    importError = "";
+    const files = (e.target as HTMLInputElement).files;
+    if (!files || files.length === 0) return;
+    try {
+      const fileList: { name: string; content: string }[] = [];
+      for (const file of Array.from(files)) {
+        fileList.push({ name: file.name, content: await file.text() });
+      }
+      const colName = files.length === 1
+        ? files[0].name.replace(/\.l2$/, "")
+        : "Lama2 Import";
+      const col = importL2Collection(fileList, colName);
+      await saveImportedCollection(col);
+    } catch (err: any) {
+      importError = err?.message ?? "Lama2 import failed";
+    }
+    (e.target as HTMLInputElement).value = "";
+  }
+
   // ── Export collection as Postman-compatible JSON ────────────
   function exportCollection(colName: string) {
     const col = loadedCollections.find(c => c.name === colName);
@@ -404,6 +425,16 @@
         <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
       </svg>
       <input type="file" accept=".har,.json" style="display:none" onchange={importHarFile} />
+    </label>
+    <label class="icon-btn" title="Import Lama2 .l2 file(s)">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+        <polyline points="14 2 14 8 20 8"/>
+        <line x1="8" y1="13" x2="16" y2="13"/>
+        <line x1="8" y1="17" x2="12" y2="17"/>
+        <text x="7" y="6" font-size="5" fill="currentColor" stroke="none">l2</text>
+      </svg>
+      <input type="file" accept=".l2" multiple style="display:none" onchange={importL2Files} />
     </label>
   </div>
   {#if importError}

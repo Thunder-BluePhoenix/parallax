@@ -86,11 +86,42 @@
   const BODY_TYPES = [
     { value: "none", label: "None" },
     { value: "json", label: "JSON" },
+    { value: "varjson", label: "VarJSON" },
     { value: "form", label: "Form Data" },
     { value: "urlencoded", label: "URL Encoded" },
     { value: "raw", label: "Raw" },
     { value: "graphql", label: "GraphQL" },
   ];
+
+  // ── VarJSON row helpers ────────────────────────────────────────
+  interface VJRow { id: number; k: string; v: string; }
+  let vjRows = $state<VJRow[]>([{ id: nextId++, k: "", v: "" }]);
+
+  $effect(() => {
+    if (activeRequest.bodyType === "varjson") {
+      const parsed: VJRow[] = activeRequest.bodyContent
+        .split("\n")
+        .filter(l => l.trim())
+        .map(l => {
+          const m = l.match(/^([\w-]*)=(.*)$/);
+          return m ? { id: nextId++, k: m[1], v: m[2] } : { id: nextId++, k: l, v: "" };
+        });
+      if (parsed.length) vjRows = parsed;
+    }
+  });
+
+  function syncVjRows() {
+    activeRequest.bodyContent = vjRows
+      .filter(r => r.k)
+      .map(r => `${r.k}=${r.v}`)
+      .join("\n");
+  }
+  function updateVjRow(id: number, field: "k" | "v", val: string) {
+    const row = vjRows.find(r => r.id === id);
+    if (row) { row[field] = val; syncVjRows(); }
+  }
+  function addVjRow() { vjRows.push({ id: nextId++, k: "", v: "" }); }
+  function removeVjRow(id: number) { vjRows = vjRows.filter(r => r.id !== id); syncVjRows(); }
 
   // ── GraphQL schema introspection ──────────────────────────────
   let schemaTypes = $state<Array<{ name: string; kind: string }>>([]);
@@ -222,6 +253,24 @@
         {#if activeRequest.bodyType === "none"}
           <div class="no-body">
             <span>This request has no body</span>
+          </div>
+        {:else if activeRequest.bodyType === "varjson"}
+          <div class="kv-editor">
+            <div class="kv-header">
+              <span>Key</span>
+              <span>Value → serialised as JSON object</span>
+            </div>
+            {#each vjRows as row (row.id)}
+              <div class="kv-row">
+                <input class="kv-input mono" type="text" value={row.k} placeholder="key"
+                  oninput={(e) => updateVjRow(row.id, "k", (e.target as HTMLInputElement).value)} />
+                <input class="kv-input mono" type="text" value={row.v} placeholder="value"
+                  oninput={(e) => updateVjRow(row.id, "v", (e.target as HTMLInputElement).value)} />
+                <button class="kv-remove" onclick={() => removeVjRow(row.id)}>×</button>
+              </div>
+            {/each}
+            <button class="add-row-btn" onclick={addVjRow}>+ Add field</button>
+            <div class="varjson-hint">Sent as <code>application/json</code> — e.g. <code>{"{"}key: value{"}"}</code></div>
           </div>
         {:else if activeRequest.bodyType === "graphql"}
           <div class="gql-toolbar">
@@ -559,6 +608,8 @@
     color: var(--text-muted);
     font-size: 12px;
   }
+  .varjson-hint { font-size: 10px; color: var(--text-muted); margin-top: 8px; }
+  .varjson-hint code { color: var(--accent-primary); }
 
   /* Auth */
   .auth-section { padding: 16px; display: flex; flex-direction: column; gap: 10px; }

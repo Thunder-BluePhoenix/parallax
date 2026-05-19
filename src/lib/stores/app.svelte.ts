@@ -51,7 +51,7 @@ export interface AuthState {
 export interface RequestState {
   id: string; name: string; method: HttpMethod; url: string;
   headers: Record<string, string>; params: Record<string, string>;
-  bodyType: "none" | "json" | "form" | "urlencoded" | "raw" | "graphql";
+  bodyType: "none" | "json" | "form" | "urlencoded" | "raw" | "graphql" | "varjson";
   bodyContent: string; auth: AuthState;
 }
 
@@ -189,6 +189,7 @@ export interface TestResult {
   name: string; passed: boolean; error?: string;
 }
 export const testResults = $state<{ results: TestResult[]; ran: boolean }>({ results: [], ran: false });
+export const jsonNormalised = $state<{ value: boolean }>({ value: false });
 
 // ============================================================
 // Load a collection request into the active tab
@@ -358,10 +359,11 @@ export async function sendRequest() {
   responseState.loading  = true;
   responseState.error    = null;
   responseState.response = null;
-  testResults.results    = [];
-  testResults.ran        = false;
+  testResults.results     = [];
+  testResults.ran         = false;
   visualizerData.template = null;
-  visualizerData.data    = null;
+  visualizerData.data     = null;
+  jsonNormalised.value    = false;
   const t0 = Date.now();
 
   try {
@@ -380,7 +382,28 @@ export async function sendRequest() {
     }
 
     const rawPayload = await resolveFileTagsInObj(buildPayload());
+    // Ensure varjson requests carry the correct content-type header
+    if (activeRequest.bodyType === "varjson" && !rawPayload.headers?.["Content-Type"]) {
+      rawPayload.headers = { ...rawPayload.headers, "Content-Type": "application/json" };
+    }
     const payload = resolveRequestTemplates(rawPayload, mergedEnv, { ...responseCache });
+
+    // Lenient JSON normalisation: fix single-quotes, trailing commas, etc. before dispatch
+    if (payload.body?.type === "json" && payload.body?.raw && !payload.body.raw.includes("{{")) {
+      try {
+        const JSON5 = (await import("json5")).default;
+        const normalised = JSON.stringify(JSON5.parse(payload.body.raw));
+        if (normalised !== payload.body.raw) {
+          payload.body.raw = normalised;
+          payload.body.content = JSON.parse(normalised);
+          jsonNormalised.value = true;
+        }
+      } catch {
+        // Body isn't parseable even with json5 — send as-is, server will reject
+      }
+    } else {
+      jsonNormalised.value = false;
+    }
 
     const result = await invoke<any>("send_request", {
       request:     payload,
@@ -449,8 +472,21 @@ function buildPayload() {
     scripts: { preRequest: activeScripts.preRequest, tests: activeScripts.tests }
   };
 }
+function varjsonToJson(raw: string): string {
+  const obj: Record<string, string> = {};
+  for (const line of raw.split("\n")) {
+    const m = line.trim().match(/^([\w-]+)=(.*)$/);
+    if (m) obj[m[1]] = m[2];
+  }
+  return JSON.stringify(obj);
+}
+
 function buildBody() {
   if (activeRequest.bodyType === "none") return null;
+  if (activeRequest.bodyType === "varjson") {
+    const jsonStr = varjsonToJson(activeRequest.bodyContent);
+    return { type: "json", content: tryParse(jsonStr), raw: jsonStr };
+  }
   return { type: activeRequest.bodyType, content: tryParse(activeRequest.bodyContent), raw: activeRequest.bodyContent };
 }
 function buildAuth() {

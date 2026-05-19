@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { responseState, responseHistory, testResults, visualizerData } from "../../stores/app.svelte";
+  import { responseState, responseHistory, testResults, visualizerData, jsonNormalised } from "../../stores/app.svelte";
   import VisualizerIframe from "./VisualizerIframe.svelte";
   import { generateTests, repairRequest, aiStatus } from "../../stores/ai.svelte";
   import { currentRequestId } from "../../stores/app.svelte";
@@ -117,6 +117,10 @@
         <span class="timing">{res.timing.totalMs}ms</span>
         <span class="status-divider">·</span>
         <span class="size">{formatSize(res.sizeBytes)}</span>
+        {#if jsonNormalised.value}
+          <span class="status-divider">·</span>
+          <span class="json-normalised" title="Body had syntax errors (single quotes, trailing commas, etc.) that were auto-corrected before sending">JSON normalised ⚠</span>
+        {/if}
       </div>
 
       <div class="view-modes">
@@ -498,6 +502,7 @@
   }
   .status-text { color: var(--text-secondary); }
   .status-divider { color: var(--text-muted); }
+  .json-normalised { font-size: 11px; color: #d19a66; font-family: var(--font-mono); cursor: default; }
   .timing { color: var(--text-secondary); font-family: var(--font-mono); }
   .size { color: var(--text-muted); font-family: var(--font-mono); font-size: 11px; }
 

@@ -220,6 +220,7 @@ func handleCLIRun(args []string) {
 	verbose := fs.Bool("v", false, "Verbose output — print final env state")
 	dataFile := fs.String("data", "", "Data file path (CSV or JSON array) for data-driven runs")
 	reporter := fs.String("reporter", "text", "Reporter: text | html")
+	outputFile := fs.String("o", "", "Write structured JSON output to file (use - for stdout)")
 	fs.Parse(args)
 
 	if fs.NArg() < 1 {
@@ -293,6 +294,24 @@ func handleCLIRun(args []string) {
 	var totalPassed, totalFailed int
 	var totalDuration int64
 
+	// Collect per-request events when --output is requested
+	type outputRequest struct {
+		Name       string `json:"name"`
+		StatusCode int    `json:"status_code"`
+		DurationMs int64  `json:"duration_ms"`
+		Passed     bool   `json:"passed"`
+		Error      string `json:"error,omitempty"`
+	}
+	type outputReport struct {
+		Collection string          `json:"collection"`
+		Passed     int             `json:"passed"`
+		Failed     int             `json:"failed"`
+		DurationMs int64           `json:"duration_ms"`
+		Timestamp  string          `json:"timestamp"`
+		Requests   []outputRequest `json:"requests"`
+	}
+	var outputRequests []outputRequest
+
 	for iter := 1; iter <= *iterations; iter++ {
 		if *iterations > 1 {
 			fmt.Printf("\n[Iteration %d]\n", iter)
@@ -309,7 +328,22 @@ func handleCLIRun(args []string) {
 			}
 		}
 
-		stats, err := runner.RunCollection(col, env)
+		var emit func(runner.StreamEvent)
+		if *outputFile != "" {
+			emit = func(e runner.StreamEvent) {
+				if e.Type == runner.EventRequestEnd {
+					outputRequests = append(outputRequests, outputRequest{
+						Name:       e.Name,
+						StatusCode: e.StatusCode,
+						DurationMs: e.DurationMs,
+						Passed:     e.Passed,
+						Error:      e.Error,
+					})
+				}
+			}
+		}
+
+		stats, err := runner.RunCollectionStream(col, env, emit)
 		if err != nil {
 			fmt.Printf("Run failed: %v\n", err)
 			os.Exit(1)
@@ -331,6 +365,27 @@ func handleCLIRun(args []string) {
 
 	if *reporter == "html" {
 		writeHTMLReport(col.Name, totalPassed, totalFailed, totalDuration)
+	}
+
+	if *outputFile != "" {
+		report := outputReport{
+			Collection: col.Name,
+			Passed:     totalPassed,
+			Failed:     totalFailed,
+			DurationMs: totalDuration,
+			Timestamp:  time.Now().UTC().Format(time.RFC3339),
+			Requests:   outputRequests,
+		}
+		reportJSON, _ := json.MarshalIndent(report, "", "  ")
+		if *outputFile == "-" {
+			fmt.Println(string(reportJSON))
+		} else {
+			if err := os.WriteFile(*outputFile, reportJSON, 0644); err != nil {
+				fmt.Printf("Error writing output file: %v\n", err)
+			} else {
+				fmt.Printf("   Output:   %s\n", *outputFile)
+			}
+		}
 	}
 
 	if *verbose {

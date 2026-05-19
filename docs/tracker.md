@@ -1,6 +1,6 @@
 # Parallax — Development Tracker
 
-Last updated: 2026-04-25 (All phases complete — 1 through 5)
+Last updated: 2026-05-19 (Phases 1–5 complete; Phases 6–8 planned — **-inspired features)
 
 ---
 
@@ -13,6 +13,9 @@ Phase 2.5  ████████████████████ 100%  �
 Phase 3    ████████████████████ 100%  ✅ Complete (AI providers, MCP server, Design Mode, script assistant, OpenAPI export)
 Phase 4    ████████████████████ 100%  ✅ Complete (auth providers, schema crawlers, response intelligence, flow builder)
 Phase 5    ████████████████████ 100%  ✅ Complete (code gen, plugins, themes, Cmd+K, CI/CD, README)
+Phase 6    ████████████████████ 100%  ✅ Complete (.l2 importer, varjson body, lenient JSON, CLI --output)
+Phase 7    ░░░░░░░░░░░░░░░░░░░░   0%  🔲 Planned  (Shell substitution + LSP server + VSCode extension)
+Phase 8    ░░░░░░░░░░░░░░░░░░░░   0%  🔲 Planned  (Web / WASM build + browser sync)
 ```
 
 ---
@@ -560,6 +563,158 @@ Phase 5    ████████████████████ 100%  �
 
 ---
 
+## Phase 6 — Quick Wins
+
+> Planned. Four low-effort, high-value features adopted from **. Full spec: `docs/phases/phase6.md`.
+
+### `.l2` File Importer
+
+| Task | Status | Notes |
+|---|---|---|
+| Parse `.l2` `---` separator blocks | ✅ Done | `src/lib/utils/l2-importer.ts` — `splitBlocks()` |
+| Extract method, URL, headers, body | ✅ Done | `parseRequestBlock()` |
+| Convert inline JS blocks → pre-request / test scripts | ✅ Done | `convertPreJs()` / `convertPostJs()` |
+| Variable substitution `${VAR}` → `{{VAR}}` | ✅ Done | `convertVars()` regex |
+| Import folder of `.l2` files as a collection | ✅ Done | `importL2Collection()` — maps subdirs to folders |
+| Add `.l2` button to Sidebar import menu | ✅ Done | `importL2Files()` + `<input multiple accept=".l2">` |
+| Import `.l2.env` / `l2config.env` as Parallax environment | ✅ Done | `importL2Env()` — skips backtick lines (Phase 7) |
+
+### `varjson` Body Type
+
+| Task | Status | Notes |
+|---|---|---|
+| Add `varjson` tab in body tab selector | ✅ Done | `RequestPanel.svelte` BODY_TYPES array |
+| `key=value` editor with inline KV rows | ✅ Done | `vjRows` state + `updateVjRow` / `syncVjRows` |
+| `varjsonToJson()` serialiser in `buildBody()` | ✅ Done | `app.svelte.ts` — auto-sets `Content-Type: application/json` |
+| Export varjson in Postman exporter | 🔲 | Serialise to `raw` JSON mode |
+
+### Lenient JSON Body Parser
+
+| Task | Status | Notes |
+|---|---|---|
+| Add `json5` npm dependency | ✅ Done | `package.json` — `^2.2.3` |
+| Normalise JSON body via `JSON5.parse()` + `JSON.stringify()` before dispatch | ✅ Done | `sendRequest()` in `app.svelte.ts` — dynamic import |
+| "JSON normalised" indicator in response status bar | ✅ Done | `jsonNormalised` store + amber badge in `ResponsePanel.svelte` |
+
+### CLI `--output FILE`
+
+| Task | Status | Notes |
+|---|---|---|
+| Add `-o / --output <file>` flag to `parallax run` | ✅ Done | `main.go` `handleCLIRun` |
+| Collect per-request events via `RunCollectionStream` emit | ✅ Done | Replaces `RunCollection` call when `--output` set |
+| `--output -` prints JSON to stdout | ✅ Done | Pipe-friendly: `parallax run col.yaml -o - \| jq '.requests'` |
+
+### Phase 6 Success Criteria
+
+| Criteria | Status |
+|---|---|
+| Can import a folder of `.l2` files as a Parallax collection | ✅ |
+| `varjson` body serialises to valid JSON and sends correctly | ✅ |
+| JSON body with single quotes / trailing commas sends without error | ✅ |
+| `parallax run col.yaml -o result.json` writes structured JSON | ✅ |
+| `parallax run col.yaml -o -` pipes JSON to stdout | ✅ |
+
+---
+
+## Phase 7 — Shell Substitution & Editor Integration
+
+> Planned. Shell command substitution in envs + LSP server + VSCode extension. Full spec: `docs/phases/phase7.md`.
+
+### Shell Command Substitution
+
+| Task | Status | Notes |
+|---|---|---|
+| `{% shell 'cmd' %}` template tag in template engine | 🔲 | `src/lib/template-engine.ts` |
+| `eval_shell_template` Rust command via `Command::new("sh").args(["-c", cmd])` | 🔲 | `src-tauri/src/commands/templates.rs` |
+| Resolve shell tags first in `resolveRequestTemplates()` | 🔲 | Output can contain `{{vars}}` |
+| 10s timeout — surface error in response pane | 🔲 | |
+| Security warning banner when shell tag detected in env editor | 🔲 | |
+| Support in CLI runner via `os/exec` | 🔲 | `src-go/runner/runner.go` |
+
+### LSP Server (Go Sidecar)
+
+| Task | Status | Notes |
+|---|---|---|
+| `--lsp` flag in Go binary | 🔲 | Starts JSON-RPC 2.0 LSP loop via stdin/stdout |
+| `initialize` / `shutdown` lifecycle | 🔲 | `src-go/lsp/server.go` |
+| `textDocument/completion` — `{{VAR}}` from active env | 🔲 | Trie prefix scan |
+| `textDocument/completion` — template tags (`{% uuid %}` etc.) | 🔲 | Static list |
+| `textDocument/hover` — resolved value for `{{VAR}}` | 🔲 | Masked for secret vars |
+| `workspace/executeCommand` → `parallax.sendRequest` | 🔲 | Reuses `runner.RunRequest()` |
+| Diagnostics — unresolved `{{VAR}}` not in any env | 🔲 | |
+
+### VSCode Extension
+
+| Task | Status | Notes |
+|---|---|---|
+| Scaffold extension (`parallax-vscode`) | 🔲 | TypeScript, `vscode-languageclient` |
+| Wire LSP client → `parallax --lsp` | 🔲 | |
+| Sidebar tree view — collections + requests | 🔲 | `TreeDataProvider` |
+| "Send Request" CodeLens above each request block | 🔲 | |
+| Response WebviewPanel | 🔲 | |
+| Environment picker status bar item | 🔲 | |
+| Publish to VS Code Marketplace | 🔲 | |
+
+### Phase 7 Success Criteria
+
+| Criteria | Status |
+|---|---|
+| `{% shell 'cmd' %}` in env resolves at send-time | 🔲 |
+| `parallax --lsp` responds to `initialize` | 🔲 |
+| VSCode extension sidebar shows collection tree | 🔲 |
+| Sending a request from VSCode shows response inline | 🔲 |
+| `{{VAR}}` autocomplete works in YAML collection files | 🔲 |
+| Extension published on VS Code Marketplace | 🔲 |
+
+---
+
+## Phase 8 — Web / WASM
+
+> Planned. Go HTTP engine compiled to WebAssembly + browser-hosted Parallax app. Full spec: `docs/phases/phase8.md`.
+
+### Go WASM Build
+
+| Task | Status | Notes |
+|---|---|---|
+| `src-go/wasm/wasm.go` entry point | 🔲 | `GOOS=js GOARCH=wasm` |
+| Expose `parallaxSendRequest(json)` via `syscall/js` | 🔲 | |
+| Expose `parallaxConvertToCode(json, lang)` via `syscall/js` | 🔲 | |
+| Bundle `wasm_exec.js` | 🔲 | |
+| Publish `parallax.wasm` as GitHub release asset | 🔲 | |
+
+### Web App Shell
+
+| Task | Status | Notes |
+|---|---|---|
+| `src/lib/platform.ts` — Tauri invoke vs WASM abstraction | 🔲 | |
+| Replace all `invoke("send_request")` calls with `platform.sendRequest()` | 🔲 | ~15 call sites |
+| GitHub API read/write for collections and environments | 🔲 | |
+| `npm run build:web` — separate Vite config | 🔲 | |
+| GitHub OAuth App redirect flow (replaces Device Flow for browser) | 🔲 | |
+| Deploy to GitHub Pages / Cloudflare Pages | 🔲 | |
+| Feature-flag desktop-only capabilities in web build | 🔲 | Proxy, health, load tester, gRPC |
+
+### CORS Proxy Mode
+
+| Task | Status | Notes |
+|---|---|---|
+| Cloudflare Worker proxy endpoint (`POST /proxy`) | 🔲 | |
+| CORS error detection + retry via proxy with user confirmation | 🔲 | |
+| Self-hosted proxy URL in settings | 🔲 | |
+
+### Phase 8 Success Criteria
+
+| Criteria | Status |
+|---|---|
+| `GOOS=js GOARCH=wasm go build` produces working `parallax.wasm` | 🔲 |
+| Web app loads in browser and sends REST requests via WASM | 🔲 |
+| Collections load/save to GitHub repo from browser | 🔲 |
+| CORS-blocked requests surface clear message + proxy retry | 🔲 |
+| Web app deployed on tag push | 🔲 |
+| Works on Chrome, Firefox, and Safari | 🔲 |
+
+---
+
 ## Decision Log
 
 | Date | Decision | Reason |
@@ -589,6 +744,12 @@ Phase 5    ████████████████████ 100%  �
 | 2026-04-23 | Mock delay stored as `x-parallax-delay-ms` header convention (not a proto field) | Avoids proto regeneration; Go strips it before sending response; UI treats it specially |
 | 2026-04-23 | CLI `--data` uses simple split-on-comma CSV (no quoting support) | Sufficient for typical env-override data files; proper CSV parser can be added later if needed |
 | 2026-04-23 | `RunCollectionStream` accepts `emit func(StreamEvent)` — nil for CLI, channel-based for gRPC | Single implementation serves both UI streaming (gRPC) and CLI text output without duplication |
+| 2026-05-19 | Phases 6–8 adopt features from ** (open-source) | ** has a literate format, LSP, and WASM build that complement Parallax without overlap |
+| 2026-05-19 | `.l2` importer in TypeScript alongside existing importers | Consistent with Postman/Insomnia/HAR importer pattern |
+| 2026-05-19 | `{% shell 'cmd' %}` tag with explicit security banner | Power users need dynamic secrets; banner ensures informed consent |
+| 2026-05-19 | LSP server via `parallax --lsp` flag on existing Go binary | Reuses sidecar binary; no separate install for editor users |
+| 2026-05-19 | Web sync uses GitHub API directly, no Parallax cloud | Consistent with existing git-native philosophy; zero infra cost |
+| 2026-05-19 | CORS proxy as Cloudflare Worker, self-hosted URL optional | Zero cold-start; free tier sufficient; privacy-conscious users can self-host |
 
 ---
 

@@ -1,0 +1,131 @@
+name: Deploy Web App
+
+# Fires on every tag push (alongside the desktop release workflow) and on
+# manual dispatch so hotfixes can be deployed without a full tag.
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+permissions:
+  contents: write   # to attach parallax.wasm to the GitHub release
+  deployments: write
+
+jobs:
+  # ── 1. Build parallax.wasm ──────────────────────────────────────────────────
+  build-wasm:
+    name: Build WASM engine
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.22"
+          cache-dependency-path: src-go/go.sum
+
+      - name: Build parallax.wasm
+        working-directory: src-go
+        env:
+          GOOS: js
+          GOARCH: wasm
+          CGO_ENABLED: "0"
+        run: go build -ldflags="-s -w" -o ../public/parallax.wasm ./wasm
+
+      - name: Copy wasm_exec.js from GOROOT
+        run: cp "$(go env GOROOT)/misc/wasm/wasm_exec.js" public/wasm_exec.js
+
+      - name: Upload wasm artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: wasm-engine
+          path: |
+            public/parallax.wasm
+            public/wasm_exec.js
+
+      # Attach wasm binary to the GitHub release on tag pushes
+      - name: Attach wasm to release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: public/parallax.wasm
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # ── 2. Build the web app ────────────────────────────────────────────────────
+  build-web:
+    name: Build web app
+    needs: build-wasm
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Download wasm artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: wasm-engine
+          path: public/
+
+      - name: Build web bundle
+        run: npm run build:web
+        env:
+          VITE_GITHUB_CLIENT_ID: ${{ secrets.WEB_GITHUB_CLIENT_ID }}
+          VITE_CORS_PROXY_URL: ${{ secrets.CORS_PROXY_URL }}
+
+      - name: Upload dist-web artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: web-dist
+          path: dist-web/
+
+  # ── 3. Deploy to Cloudflare Pages ──────────────────────────────────────────
+  deploy-pages:
+    name: Deploy to Cloudflare Pages
+    needs: build-web
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download dist-web
+        uses: actions/download-artifact@v4
+        with:
+          name: web-dist
+          path: dist-web/
+
+      - name: Deploy to Cloudflare Pages
+        uses: cloudflare/pages-action@v1
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          projectName: parallax
+          directory: dist-web
+          gitHubToken: ${{ secrets.GITHUB_TOKEN }}
+
+  # ── 4. Deploy CORS proxy Worker ─────────────────────────────────────────────
+  deploy-worker:
+    name: Deploy CORS proxy Worker
+    needs: build-wasm   # independent of web build; only needs checkout
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Deploy Cloudflare Worker
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          workingDirectory: workers/cors-proxy
+          secrets: |
+            GITHUB_CLIENT_ID
+            GITHUB_CLIENT_SECRET
+        env:
+          GITHUB_CLIENT_ID: ${{ secrets.WEB_GITHUB_CLIENT_ID }}
+          GITHUB_CLIENT_SECRET: ${{ secrets.WEB_GITHUB_CLIENT_SECRET }}

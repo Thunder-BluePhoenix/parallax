@@ -1,6 +1,5 @@
 <script lang="ts">
-  import { invoke } from "@tauri-apps/api/core";
-  import { open } from "@tauri-apps/plugin-dialog";
+  import { IS_TAURI, readFileForTemplate } from "../../platform";
   import {
     tabs, activeRequest, responseState, sendRequest, cancelRequest, persistTabs,
     loadedCollections, loadRequestIntoTab, saveTabSnapshot, restoreTabSnapshot, defaultAuth,
@@ -17,7 +16,9 @@
   let expandedFolders = $state<Record<string, boolean>>({});
   const uuid = () => Math.random().toString(36).substring(2) + Date.now().toString(36);
 
-  const METHODS = ["GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS", "WS", "SSE", "GRPC"] as const;
+  const METHODS = IS_TAURI
+    ? (["GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS", "WS", "SSE", "GRPC"] as const)
+    : (["GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS", "WS", "SSE"] as const);
 
   function switchTab(id: string) {
     if (id === tabs.activeId) return;
@@ -68,12 +69,31 @@
 
   async function importHAR() {
     try {
-      const filePath = await open({
-        filters: [{ name: "HAR Archive", extensions: ["har", "json"] }],
-        multiple: false, title: "Import HAR file",
-      }) as string | null;
-      if (!filePath) return;
-      const raw = await invoke<string>("read_file_for_template", { path: filePath });
+      let raw: string;
+      if (IS_TAURI) {
+        const { open } = await import("@tauri-apps/plugin-dialog");
+        const filePath = await open({
+          filters: [{ name: "HAR Archive", extensions: ["har", "json"] }],
+          multiple: false, title: "Import HAR file",
+        }) as string | null;
+        if (!filePath) return;
+        raw = await readFileForTemplate(filePath);
+      } else {
+        // Browser: use a file input
+        raw = await new Promise<string>((resolve, reject) => {
+          const input = document.createElement("input");
+          input.type = "file"; input.accept = ".har,.json";
+          input.onchange = () => {
+            const file = input.files?.[0];
+            if (!file) return reject(new Error("No file selected"));
+            const reader = new FileReader();
+            reader.onload = () => resolve(reader.result as string);
+            reader.onerror = () => reject(reader.error);
+            reader.readAsText(file);
+          };
+          input.click();
+        });
+      }
       const { importHar } = await import("../../utils/har-importer");
       const col = importHar(raw);
       loadedCollections.push(col);
@@ -239,7 +259,7 @@
           <WebSocketPane />
         {:else if activeRequest.method === "SSE"}
           <SSEPane />
-        {:else if activeRequest.method === "GRPC"}
+        {:else if activeRequest.method === "GRPC" && IS_TAURI}
           <GRPCPane />
         {:else}
           <ResponsePanel />

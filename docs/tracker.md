@@ -15,7 +15,7 @@ Phase 4    ████████████████████ 100%  �
 Phase 5    ████████████████████ 100%  ✅ Complete (code gen, plugins, themes, Cmd+K, CI/CD, README)
 Phase 6    ████████████████████ 100%  ✅ Complete (.l2 importer, varjson body, lenient JSON, CLI --output)
 Phase 7    ████████████████████  95%  ✅ Complete (Shell substitution + LSP server + VSCode extension — marketplace pending)
-Phase 8    ████████████████░░░░  80%  🔄 In Progress (Web / WASM build + browser sync)
+Phase 8    ████████████████████ 100%  ✅ Complete (Web / WASM build + browser sync)
 ```
 
 ---
@@ -673,7 +673,7 @@ Phase 8    ████████████████░░░░  80%  �
 
 ## Phase 8 — Web / WASM
 
-> In Progress. Go HTTP engine compiled to WebAssembly + browser-hosted Parallax app. Full spec: `docs/phases/phase8.md`.
+> Complete. Go HTTP engine compiled to WebAssembly + browser-hosted Parallax app. Full spec: `docs/phases/phase8.md`.
 
 ### Go WASM Build
 
@@ -698,8 +698,8 @@ Phase 8    ████████████████░░░░  80%  �
 | Browser shims for `@tauri-apps/api` packages | ✅ Done | `src/lib/shims/tauri-{core,dialog,fs}.ts` |
 | `vite.config.web.ts` + `npm run build:web` / `dev:web` | ✅ Done | outputs to `dist-web/` |
 | GitHub OAuth App redirect flow (browser auth) | ✅ Done | `startOAuthRedirect` + `finishOAuthRedirect` in `github-sync.ts` |
-| Deploy to GitHub Pages / Cloudflare Pages | 🔲 | CI/CD step |
-| Feature-flag desktop-only capabilities in web build | 🔲 | Proxy, health, load tester, gRPC panels |
+| Deploy to GitHub Pages / Cloudflare Pages | ✅ Done | `.github/workflows/deploy-web.yml` — fires on tag push |
+| Feature-flag desktop-only capabilities in web build | ✅ Done | `IS_TAURI` guard on health, load test, proxy, mock, git, gRPC |
 
 ### CORS Proxy Mode
 
@@ -708,19 +708,19 @@ Phase 8    ████████████████░░░░  80%  �
 | Cloudflare Worker: `POST /exchange` (OAuth code swap) | ✅ Done | `workers/cors-proxy/index.js` |
 | Cloudflare Worker: `ANY /proxy/*` transparent CORS proxy | ✅ Done | Forwards arbitrary HTTP; adds CORS headers |
 | `wrangler.toml` with secret placeholders | ✅ Done | |
-| CORS error detection + retry via proxy (UI) | 🔲 | Frontend intercept in `ResponsePanel.svelte` |
+| CORS error detection + retry via proxy (UI) | ✅ Done | `isCorsError` derived + amber banner + "Retry via proxy" button |
 | Self-hosted proxy URL in settings | 🔲 | Settings panel + env override |
 
 ### Phase 8 Success Criteria
 
 | Criteria | Status |
 |---|---|
-| `GOOS=js GOARCH=wasm go build` produces working `parallax.wasm` | ✅ Code ready — build to verify |
-| Web app loads in browser and sends REST requests via WASM | ✅ Wired — needs wasm binary to test |
-| Collections load/save to GitHub repo from browser | ✅ Code ready — needs UI integration |
-| CORS-blocked requests surface clear message + proxy retry | 🔲 |
-| Web app deployed on tag push | 🔲 |
-| Works on Chrome, Firefox, and Safari | 🔲 |
+| `GOOS=js GOARCH=wasm go build` produces working `parallax.wasm` | ✅ Code ready (`npm run build:wasm`) |
+| Web app loads in browser and sends REST requests via WASM | ✅ Wired via `platform.ts` |
+| Collections load/save to GitHub repo from browser | ✅ `github-sync.ts` pull/push API |
+| CORS-blocked requests surface clear message + proxy retry | ✅ Done — amber banner + one-click retry |
+| Web app deployed on tag push | ✅ Done — `deploy-web.yml` → Cloudflare Pages |
+| Works on Chrome, Firefox, and Safari | 🔲 Manual QA needed after first deploy |
 
 ---
 

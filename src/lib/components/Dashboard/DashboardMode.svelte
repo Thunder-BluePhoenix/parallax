@@ -1,7 +1,13 @@
 <script lang="ts">
-  import { invoke as tauriInvoke } from "@tauri-apps/api/core";
   import { onMount } from "svelte";
-  import { open } from "@tauri-apps/plugin-dialog";
+  import { IS_TAURI } from "../../platform";
+
+  // Desktop-only invoke wrapper — no-ops gracefully in browser
+  async function invoke<T = any>(cmd: string, args?: Record<string, any>): Promise<T> {
+    if (!IS_TAURI) return undefined as T;
+    const { invoke: tauriInvoke } = await import("@tauri-apps/api/core");
+    return tauriInvoke<T>(cmd, args);
+  }
   import Logo from "../Common/Logo.svelte";
   import HealthHeatmapPanel from "./HealthHeatmapPanel.svelte";
   import LiveTrafficPanel from "./LiveTrafficPanel.svelte";
@@ -22,29 +28,26 @@
   let explorationResult = $state<any>(null);
   let isExploring = $state(false);
 
-  const invoke = <T>(cmd: string, args?: Record<string, any>): Promise<T> => {
-    const fn = tauriInvoke || (window as any)?.__TAURI__?.core?.invoke;
-    return fn ? (fn as any)(cmd, args) : Promise.reject("Tauri invoke not found");
-  };
-
-  let activeSection = $state<"health" | "loadtest" | "proxy" | "mock" | "history" | "ecosystem" | "ai_settings" | "git" | "team" | "chat" | "docs" | "flow" | "plugins">("health");
+  let activeSection = $state<"health" | "loadtest" | "proxy" | "mock" | "history" | "ecosystem" | "ai_settings" | "git" | "team" | "chat" | "docs" | "flow" | "plugins">(IS_TAURI ? "health" : "history");
   let workerConnected = $state(false);
 
-  const sections = [
-    { id: "health", label: "Health Monitor", icon: "❤" },
-    { id: "loadtest", label: "Load Test", icon: "⚡" },
-    { id: "proxy", label: "Traffic", icon: "🔀" },
-    { id: "mock", label: "Mock Server", icon: "🎭" },
-    { id: "history", label: "Run History", icon: "🕒" },
-    { id: "ai_settings", label: "AI Settings", icon: "🧠" },
-    { id: "ecosystem", label: "Ecosystem", icon: "🔌" },
-    { id: "git", label: "Git", icon: "⎇" },
-    { id: "team", label: "Team", icon: "👥" },
-    { id: "chat", label: "Chat", icon: "💬", badge: true },
-    { id: "docs", label: "API Docs", icon: "📄" },
-    { id: "flow",    label: "Flow Builder", icon: "🕸" },
-    { id: "plugins", label: "Plugins",      icon: "🧩" },
+  const ALL_SECTIONS = [
+    { id: "health",      label: "Health Monitor", icon: "❤",  desktopOnly: true  },
+    { id: "loadtest",    label: "Load Test",       icon: "⚡",  desktopOnly: true  },
+    { id: "proxy",       label: "Traffic",         icon: "🔀",  desktopOnly: true  },
+    { id: "mock",        label: "Mock Server",     icon: "🎭",  desktopOnly: true  },
+    { id: "history",     label: "Run History",     icon: "🕒",  desktopOnly: false },
+    { id: "ai_settings", label: "AI Settings",     icon: "🧠",  desktopOnly: false },
+    { id: "ecosystem",   label: "Ecosystem",       icon: "🔌",  desktopOnly: false },
+    { id: "git",         label: "Git",             icon: "⎇",   desktopOnly: true  },
+    { id: "team",        label: "Team",            icon: "👥",  desktopOnly: false },
+    { id: "chat",        label: "Chat",            icon: "💬",  desktopOnly: false, badge: true },
+    { id: "docs",        label: "API Docs",        icon: "📄",  desktopOnly: false },
+    { id: "flow",        label: "Flow Builder",    icon: "🕸",  desktopOnly: false },
+    { id: "plugins",     label: "Plugins",         icon: "🧩",  desktopOnly: false },
   ] as const;
+
+  const sections = $derived(ALL_SECTIONS.filter(s => IS_TAURI || !s.desktopOnly));
 
   // Run history stats
   import { responseHistory } from "../../stores/app.svelte";
@@ -59,12 +62,10 @@
     }
   }
   async function selectFolder() {
+    if (!IS_TAURI) return;
     try {
-      const selected = await open({
-        directory: true,
-        multiple: false,
-        title: "Select Project Root"
-      });
+      const { open } = await import("@tauri-apps/plugin-dialog");
+      const selected = await open({ directory: true, multiple: false, title: "Select Project Root" });
       if (selected) {
         explorerPath = selected as string;
         runExploration();
@@ -146,22 +147,22 @@
 
   <!-- Dashboard content -->
   <div class="dashboard-content">
-    {#if activeSection === "health"}
+    {#if activeSection === "health" && IS_TAURI}
       <HealthHeatmapPanel />
 
-    {:else if activeSection === "loadtest"}
+    {:else if activeSection === "loadtest" && IS_TAURI}
       <LoadTestPanel />
 
-    {:else if activeSection === "proxy"}
+    {:else if activeSection === "proxy" && IS_TAURI}
       <LiveTrafficPanel />
 
-    {:else if activeSection === "mock"}
+    {:else if activeSection === "mock" && IS_TAURI}
       <MockServerPanel />
 
     {:else if activeSection === "ai_settings"}
       <AISettingsPanel />
 
-    {:else if activeSection === "git"}
+    {:else if activeSection === "git" && IS_TAURI}
       <GitPanel />
 
     {:else if activeSection === "team"}

@@ -7,8 +7,65 @@
   import { generateCode, CODE_LANGS, type CodeLang } from "../../utils/code-gen";
   import { activeRequest } from "../../stores/app.svelte";
 
+  import { IS_TAURI, sendRequest as platformSendRequest } from "../../platform";
+
   let showRepairPanel = $state(false);
   let repairError     = $state("");
+
+  // ── CORS proxy retry ────────────────────────────────────────────────────────
+  const CORS_PROXY_URL = (import.meta.env.VITE_CORS_PROXY_URL as string | undefined) ?? "";
+
+  const isCorsError = $derived(
+    !IS_TAURI &&
+    !!responseState.error &&
+    (responseState.error.includes("Failed to fetch") ||
+     responseState.error.includes("NetworkError") ||
+     responseState.error.includes("CORS") ||
+     responseState.error.includes("Load failed"))
+  );
+
+  let corsRetrying = $state(false);
+  let corsRetryError = $state("");
+
+  async function retryViaProxy() {
+    if (!CORS_PROXY_URL) {
+      corsRetryError = "No CORS proxy configured. Set VITE_CORS_PROXY_URL.";
+      return;
+    }
+    corsRetrying = true;
+    corsRetryError = "";
+    try {
+      // Re-issue the same request but route it through the proxy by replacing
+      // the URL with the proxy endpoint and passing the real URL in a header.
+      const proxiedRequest = {
+        ...activeRequest,
+        url: `${CORS_PROXY_URL.replace(/\/$/, "")}/proxy/`,
+        headers: {
+          ...activeRequest.headers,
+          "X-Proxy-URL": activeRequest.url,
+        },
+      };
+      const result = await platformSendRequest(proxiedRequest as any, {});
+      responseState.response = {
+        status:     result.status,
+        statusText: result.status_text ?? result.statusText ?? "",
+        headers:    result.headers ?? {},
+        body: {
+          raw:         result.body?.raw ?? "",
+          json:        result.body?.json ?? null,
+          contentType: result.body?.content_type ?? result.body?.contentType ?? "",
+        },
+        timing:    { totalMs: result.timing?.total_ms ?? result.timing?.totalMs ?? 0 },
+        sizeBytes: result.size_bytes ?? result.sizeBytes ?? 0,
+        cookies:   [],
+      };
+      responseState.error = null;
+    } catch (e: any) {
+      corsRetryError = String(e);
+    } finally {
+      corsRetrying = false;
+    }
+  }
 
   const isFailure = $derived(
     !!responseState.response && responseState.response.status >= 400
@@ -104,6 +161,29 @@
       </div>
       <p class="error-title">Request Failed</p>
       <p class="error-msg">{responseState.error}</p>
+
+      {#if isCorsError}
+        <div class="cors-banner">
+          <p class="cors-title">Looks like a CORS error</p>
+          <p class="cors-body">
+            The browser blocked this request because the server didn't include
+            <code>Access-Control-Allow-Origin</code>.
+            {#if CORS_PROXY_URL}
+              Retry through the Parallax CORS proxy?
+            {:else}
+              Set <code>VITE_CORS_PROXY_URL</code> to enable the proxy retry.
+            {/if}
+          </p>
+          {#if CORS_PROXY_URL}
+            <button class="cors-retry-btn" onclick={retryViaProxy} disabled={corsRetrying}>
+              {corsRetrying ? "Retrying…" : "Retry via proxy"}
+            </button>
+          {/if}
+          {#if corsRetryError}
+            <p class="cors-retry-error">{corsRetryError}</p>
+          {/if}
+        </div>
+      {/if}
     </div>
 
   {:else if responseState.response}
@@ -476,6 +556,22 @@
   .error-icon { color: var(--color-error); opacity: 0.7; margin-bottom: 4px; }
   .error-title { font-weight: 600; font-size: 14px; color: var(--color-error); }
   .error-msg { font-size: 12px; color: var(--text-secondary); font-family: var(--font-mono); max-width: 400px; word-break: break-all; }
+
+  .cors-banner {
+    margin-top: 16px; padding: 12px 16px; border-radius: 8px;
+    background: color-mix(in srgb, #d19a66 12%, var(--bg-secondary));
+    border: 1px solid color-mix(in srgb, #d19a66 30%, transparent);
+    max-width: 420px; text-align: left;
+  }
+  .cors-title { font-weight: 600; font-size: 13px; color: #d19a66; margin: 0 0 4px; }
+  .cors-body  { font-size: 12px; color: var(--text-secondary); margin: 0 0 10px; line-height: 1.5; }
+  .cors-body code { font-family: var(--font-mono); background: var(--bg-tertiary); padding: 1px 4px; border-radius: 3px; }
+  .cors-retry-btn {
+    padding: 5px 14px; border-radius: 5px; border: none; cursor: pointer;
+    background: #d19a66; color: #1a1a1a; font-size: 12px; font-weight: 600;
+  }
+  .cors-retry-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+  .cors-retry-error { font-size: 11px; color: var(--color-error); margin-top: 8px; font-family: var(--font-mono); word-break: break-all; }
 
   /* Status bar */
   .response-statusbar {

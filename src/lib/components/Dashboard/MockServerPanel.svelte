@@ -21,6 +21,12 @@
   let newContentType = $state("application/json");
   let newDelayMs = $state(0);
 
+  // Record mode
+  let recordLimit = $state(20);
+  let recordLoading = $state(false);
+  let recordResult = $state<{ count: number; paths: string[] } | null>(null);
+  let recordError = $state<string | null>(null);
+
   async function loadRules() {
     try {
        rules = await invoke("list_mock_rules");
@@ -61,6 +67,24 @@
       rules = rules.filter(r => r.id !== id);
     } catch (e) {
       console.error("Failed to remove mock rule:", e);
+    }
+  }
+
+  async function importFromTraffic() {
+    recordLoading = true;
+    recordResult = null;
+    recordError = null;
+    try {
+      const imported: MockRule[] = await invoke("mock_import_from_traffic", { limit: recordLimit });
+      // Merge into local rules list (skip duplicates by id)
+      const existingIds = new Set(rules.map(r => r.id));
+      const fresh = imported.filter(r => !existingIds.has(r.id));
+      rules = [...rules, ...fresh];
+      recordResult = { count: fresh.length, paths: fresh.map(r => `${r.method} ${r.path}`) };
+    } catch (e) {
+      recordError = String(e);
+    } finally {
+      recordLoading = false;
     }
   }
 
@@ -114,6 +138,40 @@
       </div>
       <button class="btn-primary" onclick={addRule}>Create Mock Endpoint</button>
     </div>
+  </div>
+
+  <div class="record-section">
+    <div class="record-header">
+      <span class="record-title">Record from Proxy Traffic</span>
+      <span class="record-desc">Convert captured proxy entries into mock rules automatically.</span>
+    </div>
+    <div class="record-row">
+      <div class="config-field" style="flex: 0 0 120px;">
+        <label for="record-limit">Max entries</label>
+        <input id="record-limit" type="number" min="1" max="200" class="form-input" bind:value={recordLimit} />
+      </div>
+      <button class="btn-record" onclick={importFromTraffic} disabled={recordLoading}>
+        {recordLoading ? "Capturing…" : "⏺ Capture from Proxy"}
+      </button>
+    </div>
+    {#if recordError}
+      <div class="record-error">{recordError}</div>
+    {/if}
+    {#if recordResult}
+      <div class="record-success">
+        <strong>{recordResult.count}</strong> rule{recordResult.count !== 1 ? "s" : ""} imported.
+        {#if recordResult.paths.length > 0}
+          <ul class="record-paths">
+            {#each recordResult.paths.slice(0, 8) as p}
+              <li class="mono">{p}</li>
+            {/each}
+            {#if recordResult.paths.length > 8}
+              <li class="text-muted">…and {recordResult.paths.length - 8} more</li>
+            {/if}
+          </ul>
+        {/if}
+      </div>
+    {/if}
   </div>
 
   <div class="rules-list">
@@ -228,4 +286,37 @@
 
   .rule-body-preview { font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .empty-state { text-align: center; padding: 40px; color: var(--text-muted); font-size: 13px; border: 1px dashed var(--border-default); border-radius: var(--radius-md); }
+
+  .record-section {
+    background: var(--bg-surface);
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-lg);
+    padding: 16px 20px;
+    margin-bottom: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+  .record-header { display: flex; align-items: baseline; gap: 12px; }
+  .record-title { font-size: 13px; font-weight: 700; color: var(--text-primary); }
+  .record-desc { font-size: 11px; color: var(--text-muted); }
+  .record-row { display: flex; gap: 12px; align-items: flex-end; }
+  .btn-record {
+    background: transparent;
+    border: 1px solid var(--accent-primary);
+    color: var(--accent-primary);
+    padding: 8px 16px;
+    border-radius: var(--radius-md);
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: var(--transition-fast);
+    white-space: nowrap;
+  }
+  .btn-record:hover:not(:disabled) { background: var(--accent-primary); color: white; }
+  .btn-record:disabled { opacity: 0.5; cursor: not-allowed; }
+  .record-error { font-size: 12px; color: var(--color-error); }
+  .record-success { font-size: 12px; color: var(--color-success, #98c379); }
+  .record-paths { margin: 6px 0 0 16px; padding: 0; list-style: disc; display: flex; flex-direction: column; gap: 2px; }
+  .record-paths li { font-size: 11px; color: var(--text-secondary); }
 </style>

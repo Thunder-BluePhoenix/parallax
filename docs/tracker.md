@@ -283,7 +283,7 @@ Phase 5    ████████████████████ 100%  �
 | Path parameters (`:id`) and wildcards (`*`) | ✅ Done | `mock.go` `matchPath()` — `:param` captured into `{{.Params.id}}` |
 | Response templating with request data | ✅ Done | `mock.go` `renderBody()` — Go `text/template`; `{{.Params.*}}` and `{{.Query.*}}` |
 | Configurable response delay | ✅ Done | `x-parallax-delay-ms` header convention; UI delay field in MockServerPanel; Go sleeps before responding |
-| Record mode (proxy + auto-generate rules) | 🔲 | Deferred — complex; not blocking Phase 2.5 |
+| Record mode (proxy + auto-generate rules) | ✅ Done | `mock_import_from_traffic` Rust command + "Capture from Proxy" UI in `MockServerPanel.svelte` |
 | `parallax-cli mock` command | ✅ Done | `main.go` `handleCLIMock` — standalone mock server on any port |
 
 ### gRPC Streaming Bridge
@@ -555,8 +555,8 @@ Phase 5    ████████████████████ 100%  �
 | ~~`WatchFiles` gRPC stream not wired to Tauri~~ | ~~need Rust `watch_workspace` command~~ | ✅ Resolved — `watcher.rs` done |
 | ~~`StreamRunner` not implemented~~ | ~~`RunCollection` gRPC is a stub~~ | ✅ Resolved — full streaming runner |
 | ~~`parallax-cli --reporter html` and `--data` flags~~ | ~~CLI run works but no HTML report~~ | ✅ Resolved — both done |
-| Mock record mode | Would auto-generate rules from proxy traffic | 🟢 P2 — deferred to post-2.5 |
-| Sidebar drag-and-drop reordering | Collections are static order | 🟢 P2 |
+| ~~Mock record mode~~ | ~~Would auto-generate rules from proxy traffic~~ | ✅ Resolved — `mock_import_from_traffic` + "Capture from Proxy" UI |
+| ~~Sidebar drag-and-drop reordering~~ | ~~Collections are static order~~ | ✅ Resolved — HTML5 drag-and-drop in `Sidebar.svelte` |
 
 ---
 
